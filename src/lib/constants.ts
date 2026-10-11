@@ -59,6 +59,29 @@ export const TENANT_HEADERS = {
   requestHost: 'x-ul-request-host',
   primaryHost: 'x-ul-primary-host',
   locale: 'x-ul-locale',
+  surface: 'x-ul-surface',
 } as const;
 
 export type HostMode = 'platform' | 'path' | 'subdomain' | 'custom';
+
+/**
+ * Which part of the product a request is for. Set by the proxy and used to
+ * ship only the message namespaces that surface actually needs.
+ */
+export type Surface = 'platform' | 'tenant-public' | 'tenant-admin';
+
+/**
+ * next-intl serialises whatever getRequestConfig returns into the page
+ * payload. Returning the whole catalogue puts every dashboard label into every
+ * public landing page — measured at all 6 dashboard-only strings present, for
+ * roughly 10 KB of Bangla JSON a visitor can never see. A storefront needs two
+ * namespaces.
+ *
+ * The admin keeps `storefront` because its live preview renders the real
+ * landing-page blocks.
+ */
+export const SURFACE_NAMESPACES: Record<Surface, string[]> = {
+  platform: ['common', 'auth', 'platform'],
+  'tenant-public': ['common', 'storefront'],
+  'tenant-admin': ['common', 'auth', 'admin', 'storefront'],
+};

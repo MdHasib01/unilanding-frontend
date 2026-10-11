@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { RESERVED_SLUGS, TENANT_HEADERS, type HostMode } from '@/lib/constants';
+import { RESERVED_SLUGS, TENANT_HEADERS, type HostMode, type Surface } from '@/lib/constants';
+import { normalizeHost, platformHosts, isPlatformHost, tenantLabelFromHost } from '@/lib/host';
 
 /**
  * Tenant resolution.
@@ -28,6 +29,11 @@ import { RESERVED_SLUGS, TENANT_HEADERS, type HostMode } from '@/lib/constants';
  *   unilanding.com/milkready        -> no rewrite, falls through to [tenantSlug]
  *   milkready.unilanding.com/       -> rewrite to /milkready       (no lookup)
  *   milkready.com/                  -> rewrite to /milkready       (cached lookup)
+ *
+ * The platform answers to several names (see PLATFORM_HOST_ALIASES). localhost
+ * and 127.0.0.1 are platform hosts in development, so the app works straight
+ * after boot — without them, http://localhost:3000 falls through to the
+ * custom-domain branch and renders "domain not configured".
  */
 
 export const config = {
@@ -47,9 +53,15 @@ export const config = {
   matcher: ['/((?!api/|ul/|_next/static|_next/image|favicon.ico|.*\\.[\\w]+$).*)'],
 };
 
-const PLATFORM_HOST = (process.env.PLATFORM_HOST || 'unilanding.local:3000')
-  .split(':')[0]
-  .toLowerCase();
+/**
+ * Every name that means "the platform". Exact matches serve the platform; a
+ * single-label subdomain of any of them is a tenant, so demo.localhost:3000
+ * works too (browsers resolve *.localhost to loopback with no hosts file).
+ */
+const PLATFORM_HOSTS = platformHosts(
+  process.env.PLATFORM_HOST || 'unilanding.local:3000',
+  process.env.PLATFORM_HOST_ALIASES ?? 'localhost,127.0.0.1,::1'
+);
 const INTERNAL_API_URL = process.env.INTERNAL_API_URL || 'http://127.0.0.1:5000';
 const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY || '';
 
@@ -97,20 +109,6 @@ function effectiveHost(request: NextRequest): string {
     if (fwd) return normalizeHost(fwd.split(',')[0]);
   }
   return normalizeHost(request.headers.get('host'));
-}
-
-/** Strip port and trailing dot; lowercase. Dev hosts carry :3000. */
-function normalizeHost(raw: string | null): string {
-  if (!raw) return '';
-  let h = raw.trim().toLowerCase();
-  if (h.startsWith('[')) {
-    const close = h.indexOf(']');
-    if (close !== -1) return h.slice(1, close);
-  }
-  const colon = h.lastIndexOf(':');
-  if (colon !== -1 && /^\d+$/.test(h.slice(colon + 1))) h = h.slice(0, colon);
-  if (h.endsWith('.')) h = h.slice(0, -1);
-  return h;
 }
 
 async function fetchHost(host: string): Promise<Resolved> {
@@ -194,6 +192,21 @@ export function bustHostCache(host?: string) {
   else cache.clear();
 }
 
+/**
+ * Which surface is this, so only the needed i18n namespaces are shipped.
+ * `pathAfterBase` is the path with any /<slug> prefix already removed.
+ */
+function surfaceFor(mode: HostMode, pathAfterBase: string): Surface {
+  if (mode === 'platform') {
+    return pathAfterBase === '/platform' || pathAfterBase.startsWith('/platform/')
+      ? 'platform'
+      : 'platform';
+  }
+  return pathAfterBase === '/admin' || pathAfterBase.startsWith('/admin/')
+    ? 'tenant-admin'
+    : 'tenant-public';
+}
+
 function withTenantHeaders(
   request: NextRequest,
   ctx: {
@@ -204,6 +217,7 @@ function withTenantHeaders(
     tenantId?: string;
     primaryHost?: string;
     locale?: string;
+    surface?: Surface;
   },
   rewriteTo?: URL
 ) {
@@ -218,6 +232,7 @@ function withTenantHeaders(
   headers.set(TENANT_HEADERS.id, ctx.tenantId ?? '');
   headers.set(TENANT_HEADERS.primaryHost, ctx.primaryHost ?? ctx.host);
   headers.set(TENANT_HEADERS.locale, ctx.locale ?? '');
+  headers.set(TENANT_HEADERS.surface, ctx.surface ?? 'tenant-public');
 
   return rewriteTo
     ? NextResponse.rewrite(rewriteTo, { request: { headers } })
@@ -230,7 +245,7 @@ export async function proxy(request: NextRequest) {
   const firstSegment = url.pathname.split('/')[1] ?? '';
 
   // ── 1. The platform host. No lookup, no rewrite. ──
-  if (host === PLATFORM_HOST || host === `www.${PLATFORM_HOST}`) {
+  if (isPlatformHost(host, PLATFORM_HOSTS)) {
     // /admin is tenant-only; on the platform host it means the platform dashboard.
     if (url.pathname === '/admin' || url.pathname.startsWith('/admin/')) {
       return NextResponse.redirect(new URL('/platform', url));
@@ -240,25 +255,40 @@ export async function proxy(request: NextRequest) {
     // It falls through to [tenantSlug] with no rewrite — one less hop, and the
     // public URL is exactly the one the product promises.
     if (firstSegment && !RESERVED_SLUGS.has(firstSegment)) {
+      const after = url.pathname.slice(firstSegment.length + 1) || '/';
       return withTenantHeaders(request, {
         slug: firstSegment,
         basePath: `/${firstSegment}`,
         mode: 'path',
         host,
+        surface: surfaceFor('path', after),
       });
     }
-    return NextResponse.next();
+    // The platform's own pages. Still goes through withTenantHeaders so the
+    // surface header is set (and any client-sent x-ul-* is overwritten).
+    return withTenantHeaders(request, {
+      slug: '',
+      basePath: '',
+      mode: 'platform',
+      host,
+      surface: 'platform',
+    });
   }
 
   // ── 2. A platform subdomain. The label IS the slug, so still no lookup. ──
-  if (host.endsWith(`.${PLATFORM_HOST}`)) {
-    const label = host.slice(0, -(PLATFORM_HOST.length + 1));
-    if (!label || label.includes('.') || RESERVED_SLUGS.has(label)) {
-      return NextResponse.next();
-    }
+  const label = tenantLabelFromHost(host, PLATFORM_HOSTS);
+  if (label) {
+    if (RESERVED_SLUGS.has(label)) return NextResponse.next();
     return withTenantHeaders(
       request,
-      { slug: label, basePath: '', mode: 'subdomain', host, primaryHost: host },
+      {
+        slug: label,
+        basePath: '',
+        mode: 'subdomain',
+        host,
+        primaryHost: host,
+        surface: surfaceFor('subdomain', url.pathname),
+      },
       new URL(`/${label}${url.pathname}${url.search}`, url)
     );
   }
@@ -293,6 +323,7 @@ export async function proxy(request: NextRequest) {
       tenantId: tenant.tenantId,
       primaryHost: tenant.primaryHost,
       locale: tenant.defaultLocale,
+      surface: surfaceFor('custom', url.pathname),
     },
     new URL(`/${tenant.slug}${url.pathname}${url.search}`, url)
   );

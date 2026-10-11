@@ -1,6 +1,14 @@
 import { cookies, headers } from 'next/headers';
 import { getRequestConfig } from 'next-intl/server';
-import { LOCALES, DEFAULT_LOCALE, LOCALE_COOKIE, type Locale } from '@/lib/constants';
+import {
+  LOCALES,
+  DEFAULT_LOCALE,
+  LOCALE_COOKIE,
+  SURFACE_NAMESPACES,
+  TENANT_HEADERS,
+  type Locale,
+  type Surface,
+} from '@/lib/constants';
 
 /**
  * next-intl WITHOUT i18n routing — no [locale] URL segment, no proxy involvement.
@@ -28,10 +36,28 @@ export default getRequestConfig(async () => {
     (candidates.find((c): c is Locale => Boolean(c) && LOCALES.includes(c as Locale)) as Locale) ??
     DEFAULT_LOCALE;
 
+  const all = (await import(`../../messages/${locale}.json`)).default as Record<
+    string,
+    unknown
+  >;
+
+  /*
+   * Ship only the namespaces this surface uses.
+   *
+   * next-intl serialises whatever is returned here into the page payload, so
+   * returning everything put every dashboard label into every public landing
+   * page. The storefront needs two namespaces out of five.
+   */
+  const surface = (headerList.get(TENANT_HEADERS.surface) as Surface) || 'tenant-public';
+  const wanted = SURFACE_NAMESPACES[surface] ?? SURFACE_NAMESPACES['tenant-public'];
+  const messages = Object.fromEntries(
+    wanted.filter((ns) => ns in all).map((ns) => [ns, all[ns]])
+  );
+
   return {
     // Required in next-intl v4: getRequestConfig must return the locale.
     locale,
-    messages: (await import(`../../messages/${locale}.json`)).default,
+    messages,
     timeZone: 'Asia/Dhaka',
     now: new Date(),
   };
