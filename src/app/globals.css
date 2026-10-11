@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -52,6 +53,12 @@
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
 
+  /*
+   * --font-ui is set on <html> from the active locale (see layout.tsx), so the
+   * whole UI switches between a Bengali-capable face and a Latin one without
+   * any component knowing about locales. The fallbacks matter: Bengali
+   * rendered in a Latin-only face is unreadable, not merely ugly.
+   */
   --font-sans: var(--font-ui), "Hind Siliguri", "Noto Sans Bengali", system-ui, sans-serif;
   --font-heading: var(--font-ui), "Hind Siliguri", "Noto Sans Bengali", system-ui, sans-serif;
 
@@ -60,6 +67,8 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) * 1.5);
   --radius-2xl: calc(var(--radius) * 2);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
 }
 
 /**
@@ -69,88 +78,99 @@
  * tenant scope supplies the colour.
  */
 :root {
-  --background: #ffffff;
-  --foreground: #0a0a0a;
-  --card: #ffffff;
-  --card-foreground: #0a0a0a;
-  --popover: #ffffff;
-  --popover-foreground: #0a0a0a;
-  --primary: #171717;
-  --primary-foreground: #fafafa;
-  --secondary: #f5f5f5;
-  --secondary-foreground: #171717;
-  --muted: #f5f5f5;
-  --muted-foreground: #737373;
-  --accent: #f5f5f5;
-  --accent-foreground: #171717;
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
   --accent-strong: #525252;
   --cta: #171717;
   --cta-foreground: #fafafa;
-  --destructive: #e7000b;
+  --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: #ffffff;
-  --border: #e5e5e5;
-  --input: #e5e5e5;
-  --ring: #a1a1a1;
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
   --radius: 0.625rem;
 
-  --sidebar: #fafafa;
-  --sidebar-foreground: #0a0a0a;
-  --sidebar-primary: #171717;
-  --sidebar-primary-foreground: #fafafa;
-  --sidebar-accent: #f0f0f0;
-  --sidebar-accent-foreground: #171717;
-  --sidebar-border: #e5e5e5;
-  --sidebar-ring: #a1a1a1;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
 
-  --chart-1: #2563eb;
-  --chart-2: #16a34a;
-  --chart-3: #d97706;
-  --chart-4: #9333ea;
-  --chart-5: #dc2626;
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
 }
 
 .dark {
-  --background: #0a0a0a;
-  --foreground: #fafafa;
-  --card: #171717;
-  --card-foreground: #fafafa;
-  --popover: #171717;
-  --popover-foreground: #fafafa;
-  --primary: #fafafa;
-  --primary-foreground: #171717;
-  --secondary: #262626;
-  --secondary-foreground: #fafafa;
-  --muted: #262626;
-  --muted-foreground: #a1a1a1;
-  --accent: #262626;
-  --accent-foreground: #fafafa;
-  --border: #2a2a2a;
-  --input: #2a2a2a;
-  --ring: #525252;
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
 
-  --sidebar: #171717;
-  --sidebar-foreground: #fafafa;
-  --sidebar-primary: #fafafa;
-  --sidebar-primary-foreground: #171717;
-  --sidebar-accent: #262626;
-  --sidebar-accent-foreground: #fafafa;
-  --sidebar-border: #2a2a2a;
-  --sidebar-ring: #525252;
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
 }
 
 @layer base {
   * {
     border-color: var(--border);
+    @apply border-border outline-ring/50;
   }
   body {
     background-color: var(--background);
     color: var(--foreground);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+    @apply bg-background text-foreground;
   }
   /* Bengali needs a little more line height to stay readable. */
   :lang(bn) {
     line-height: 1.75;
+  }
+  html {
+    @apply font-sans;
   }
 }
 

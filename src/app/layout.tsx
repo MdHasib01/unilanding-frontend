@@ -3,6 +3,8 @@ import { Hind_Siliguri, Inter } from 'next/font/google';
 import { NextIntlClientProvider } from 'next-intl';
 import { getLocale } from 'next-intl/server';
 import './globals.css';
+import { cn } from "@/lib/utils";
+
 
 /**
  * Two font families, swapped by the active locale.
@@ -47,7 +49,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       // Next 16 no longer overrides scroll-behavior during navigation unless
       // asked, and smooth in-page scrolling is what every CTA relies on.
       data-scroll-behavior="smooth"
-      className={`${bengali.variable} ${latin.variable}`}
+      className={cn(bengali.variable, latin.variable, 'font-sans')}
       style={{ ['--font-ui' as string]: locale === 'bn' ? 'var(--font-bengali)' : 'var(--font-latin)' }}
     >
       <body>
