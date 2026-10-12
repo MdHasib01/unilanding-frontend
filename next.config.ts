@@ -24,6 +24,8 @@ const nextConfig: NextConfig = {
       { source: '/api/platform/:path*', destination: `${backend}/api/platform/:path*` },
       { source: '/api/t/:path*', destination: `${backend}/api/t/:path*` },
       { source: '/api/public/:path*', destination: `${backend}/api/public/:path*` },
+      // Locally stored uploads (used when Cloudinary is not configured).
+      { source: '/api/media/:path*', destination: `${backend}/api/media/:path*` },
       { source: '/api/health', destination: `${backend}/api/health` },
     ];
   },

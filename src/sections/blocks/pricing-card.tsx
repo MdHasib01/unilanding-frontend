@@ -1,141 +1,139 @@
 'use client';
 
-import { useState } from 'react';
-import Image from 'next/image';
-import { Check } from 'lucide-react';
+/* eslint-disable @next/next/no-img-element -- product shots are tenant uploads from any host */
+
+import { motion, useReducedMotion } from 'framer-motion';
+import { Timer } from 'lucide-react';
 import { tt } from '@/lib/i18n-text';
-import { SectionShell, SectionHeading } from '@/components/shared/section-shell';
-import { Reveal } from '@/components/shared/reveal';
-import { ScrollCta } from '@/components/shared/scroll-cta';
-import { formatMoney, discountPercent } from '@/lib/format';
-import { cn } from '@/lib/utils';
-import type { SectionRendererProps } from '../types';
+import { formatMoney, discountPercent, toBengaliDigits } from '@/lib/format';
+import { RichLine } from '@/components/shared/section-shell';
+import { CtaButton } from '@/components/landing/cta-button';
+import { useCountdown, formatClock } from '@/components/landing/use-countdown';
+import type { SectionCtx, SectionRendererProps } from '../types';
 
 type Data = {
   title?: unknown;
   productId?: string;
-  showVariants?: boolean;
-  savingsLabel?: unknown;
+  productTitle?: unknown;
+  image?: { url?: string; alt?: string };
+  ribbonText?: string;
+  savingsText?: unknown;
+  showTimer?: boolean;
+  timerLabel?: unknown;
   ctaText?: unknown;
-  bullets?: { text?: unknown }[];
+  ctaTarget?: string;
 };
 
 /**
- * Prices are read from the product catalogue passed down in ctx, never typed
- * into the section. In the reference, the price lived in JSX in four separate
- * files and drifted — a discount shown on the pricing card that the sticky bar
- * and the order summary disagreed with.
+ * The product a commerce section shows, and its real prices. Prices are never
+ * typed into copy: they come from the catalogue, so the page and the order
+ * the server prices can never disagree.
  */
+export function resolveOffer(ctx: SectionCtx, productId?: string) {
+  const product = ctx.products.find((p) => p.id === productId) ?? ctx.products[0] ?? null;
+  if (!product) return null;
+  const list = product.basePrice;
+  const sale = Math.min(product.offerPrice ?? product.basePrice, product.basePrice);
+  const pct = discountPercent(list, sale);
+  const num = (n: number) => (ctx.locale === 'bn' ? toBengaliDigits(n) : String(n));
+  return {
+    product,
+    list,
+    sale,
+    saving: list - sale,
+    pct,
+    money: (n: number) => formatMoney(n, ctx.currency, ctx.locale),
+    num,
+  };
+}
+
+/** The reference MilkReady price card: ribbon, product jar, struck price, timer. */
 export function PricingCard({ data, ctx }: SectionRendererProps<Data>) {
   const t = (v: unknown) => tt(v, ctx.locale, ctx.fallbackLocale);
+  const reduce = useReducedMotion();
+  const offer = resolveOffer(ctx, data.productId);
+  const countdown = useCountdown();
 
-  const product =
-    ctx.products.find((p) => p.id === data.productId) ?? ctx.products[0] ?? null;
+  const image =
+    data.image?.url?.trim() || offer?.product.image?.url?.trim() || ctx.brand.productImageUrl;
+  const productTitle = t(data.productTitle) || offer?.product.name || ctx.brand.name;
+  const ribbon = data.ribbonText?.trim() || (offer?.pct ? `${offer.pct}% OFF` : '');
+  const savings =
+    offer && offer.saving > 0
+      ? (t(data.savingsText) || '{amount}')
+          .replace('{amount}', offer.money(offer.saving))
+          .replace('{percent}', offer.num(offer.pct ?? 0))
+      : '';
+  const ctaText = t(data.ctaText);
 
-  const [variantId, setVariantId] = useState<string | null>(
-    product?.variants?.[0]?.id ?? null
-  );
-
-  if (!product) {
-    // Nothing to price yet. In the editor say so; on a live page stay silent
-    // rather than render an empty card.
-    return ctx.mode === 'preview' ? (
-      <SectionShell width="default">
-        <p className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-          Add a product in Products, then pick it in this section.
-        </p>
-      </SectionShell>
-    ) : null;
-  }
-
-  const variant = product.variants?.find((v) => v.id === variantId) ?? null;
-  const list = variant ? variant.price : product.basePrice;
-  const sale = variant ? (variant.offerPrice ?? variant.price) : (product.offerPrice ?? product.basePrice);
-  const off = discountPercent(list, sale);
-  const bullets = (data.bullets ?? []).map((b) => t(b.text)).filter(Boolean);
-  const image = variant?.image?.url || product.image?.url;
+  const enter = (from: Record<string, number>) =>
+    reduce
+      ? {}
+      : {
+          initial: { opacity: 0, ...from },
+          whileInView: { opacity: 1, y: 0, scale: 1 },
+          viewport: { once: true },
+          transition: { duration: 0.5 },
+        };
 
   return (
-    <SectionShell width="default" id="pricing">
-      <SectionHeading title={t(data.title)} />
-      <Reveal>
-        <div className="relative overflow-hidden rounded-3xl border-2 border-primary/30 bg-card shadow-lg">
-          {off ? (
-            <div className="absolute right-0 top-0 rounded-bl-2xl bg-primary px-4 py-1.5 text-sm font-bold text-primary-foreground">
-              {off}% OFF
+    <section className="border-t border-slate-200/60 bg-slate-50 px-4 py-10 md:py-16">
+      <div className="mx-auto max-w-md text-center">
+        {t(data.title) ? (
+          <motion.div {...enter({ y: 15 })} className="mb-6">
+            <h2 className="text-xl font-extrabold leading-snug text-slate-800 sm:text-2xl">
+              <RichLine text={t(data.title)} />
+            </h2>
+          </motion.div>
+        ) : null}
+
+        <motion.div
+          {...enter({ scale: 0.95 })}
+          className="relative overflow-hidden rounded-3xl border-2 border-primary-tint bg-white p-6 shadow-md"
+        >
+          {ribbon ? (
+            <div className="absolute -right-[34px] top-4 rotate-45 bg-primary px-10 py-1 text-[10px] font-black uppercase tracking-wider text-primary-foreground shadow-sm sm:text-xs">
+              {ribbon}
             </div>
           ) : null}
 
-          <div className="grid gap-6 p-6 sm:p-8 md:grid-cols-[auto_1fr] md:gap-8">
-            {image ? (
-              <div className="relative mx-auto size-36 overflow-hidden rounded-2xl bg-muted md:size-44">
-                <Image src={image} alt={product.name} fill sizes="176px" className="object-cover" />
+          <div className="relative mx-auto mb-4 flex size-32 items-center justify-center sm:size-40">
+            <img src={image} alt={productTitle} loading="lazy" decoding="async" className="size-full object-contain drop-shadow-xl" />
+          </div>
+
+          <h3 className="mb-3 text-lg font-extrabold text-slate-900">{productTitle}</h3>
+
+          {offer ? (
+            <div className="mb-4 flex flex-col items-center gap-1">
+              <div className="flex items-baseline justify-center gap-3">
+                {offer.saving > 0 ? (
+                  <span className="text-base font-bold text-slate-400 line-through sm:text-lg">{offer.money(offer.list)}</span>
+                ) : null}
+                <span className="text-3xl font-black tracking-tight text-primary sm:text-4xl">{offer.money(offer.sale)}</span>
               </div>
-            ) : null}
-
-            <div className="text-center md:text-left">
-              <h3 className="text-xl font-bold text-card-foreground sm:text-2xl">
-                {product.name}
-                {variant ? <span className="text-muted-foreground"> — {variant.name}</span> : null}
-              </h3>
-
-              {data.showVariants && (product.variants?.length ?? 0) > 1 ? (
-                <div className="mt-4 flex flex-wrap justify-center gap-2 md:justify-start">
-                  {product.variants.map((v) => (
-                    <button
-                      key={v.id}
-                      type="button"
-                      onClick={() => setVariantId(v.id)}
-                      className={cn(
-                        'rounded-full border px-3.5 py-1.5 text-sm font-medium transition',
-                        v.id === variantId
-                          ? 'border-primary bg-primary/10 text-primary'
-                          : 'border-border text-muted-foreground hover:border-primary/40'
-                      )}
-                    >
-                      {v.name}
-                    </button>
-                  ))}
+              {savings ? (
+                <div className="inline-block rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
+                  {savings}
                 </div>
               ) : null}
-
-              <div className="mt-5 flex items-end justify-center gap-3 md:justify-start">
-                <span className="text-3xl font-extrabold leading-none text-primary sm:text-4xl">
-                  {formatMoney(sale, ctx.currency, ctx.locale)}
-                </span>
-                {sale < list ? (
-                  <span className="pb-1 text-lg text-muted-foreground line-through">
-                    {formatMoney(list, ctx.currency, ctx.locale)}
-                  </span>
-                ) : null}
-              </div>
-
-              {sale < list && t(data.savingsLabel) ? (
-                <p className="mt-1.5 text-sm font-semibold text-emerald-600">
-                  {t(data.savingsLabel)} {formatMoney(list - sale, ctx.currency, ctx.locale)}
-                </p>
-              ) : null}
-
-              {bullets.length > 0 ? (
-                <ul className="mt-5 space-y-2 text-left">
-                  {bullets.map((b) => (
-                    <li key={b} className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <Check className="mt-0.5 size-4 shrink-0 text-emerald-600" />
-                      {b}
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-
-              <div className="mt-6">
-                <ScrollCta target="order" mode={ctx.mode} size="lg" className="w-full sm:w-auto">
-                  {t(data.ctaText) || 'Order'}
-                </ScrollCta>
-              </div>
             </div>
-          </div>
-        </div>
-      </Reveal>
-    </SectionShell>
+          ) : null}
+
+          {data.showTimer && countdown ? (
+            <div className="mb-5 flex items-center justify-center gap-2 rounded-xl border border-primary-tint bg-primary-soft px-3 py-2 text-xs font-medium text-slate-700">
+              <Timer className="size-4 shrink-0 text-primary" />
+              {t(data.timerLabel) ? <span>{t(data.timerLabel)}</span> : null}
+              <span className="font-mono text-sm font-bold text-primary">{formatClock(countdown)}</span>
+            </div>
+          ) : null}
+
+          {ctaText ? (
+            <CtaButton mode={ctx.mode} target={data.ctaTarget} weight="black" className="w-full sm:w-full">
+              {ctaText}
+            </CtaButton>
+          ) : null}
+        </motion.div>
+      </div>
+    </section>
   );
 }

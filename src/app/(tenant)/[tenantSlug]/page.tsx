@@ -3,9 +3,12 @@ import { notFound } from 'next/navigation';
 import { getTenantContext, canonicalUrl } from '@/lib/tenant-context.server';
 import { getPublicPage, getPreviewPage } from '@/lib/server-api';
 import { themeToCss } from '@/lib/theme-css';
+import { resolveBrand } from '@/lib/brand';
 import { tt } from '@/lib/i18n-text';
 import { RenderPage } from '@/sections/renderer';
 import { TenantAnalytics } from '@/components/analytics/tenant-analytics';
+import { LandingLoader } from '@/components/landing/landing-loader';
+import { loaderSeenScript } from '@/components/landing/loader-seen';
 import type { SectionCtx } from '@/sections/types';
 
 type Props = {
@@ -32,7 +35,8 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   if (!bundle) return { title: 'Not found', robots: { index: false, follow: false } };
 
   const { page, tenant, locale } = bundle;
-  const title = tt(page.seo?.title, locale, tenant.defaultLocale) || tenant.name;
+  const brand = resolveBrand(page.brand, tenant.name);
+  const title = tt(page.seo?.title, locale, tenant.defaultLocale) || brand.name;
   const description = tt(page.seo?.description, locale, tenant.defaultLocale);
   // Always the tenant's PRIMARY host, never the host this request arrived on,
   // or path mode / subdomain / custom domain would compete as three copies of
@@ -44,7 +48,9 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   // tenant's page.
   const canonical =
     page.seo?.canonicalOverride || canonicalUrl({ ...ctx, primaryHost: bundle.primaryHost }, '/');
-  const ogImage = page.seo?.ogImage?.url;
+  // A page without its own share image falls back to the product shot.
+  const ogImage = page.seo?.ogImage?.url || brand.productImageUrl;
+  const favicon = brand.faviconUrl || tenant.favicon?.url;
 
   return {
     title,
@@ -52,12 +58,12 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
     alternates: { canonical },
     robots: page.seo?.noindex ? { index: false, follow: false } : undefined,
     keywords: page.seo?.keywords,
-    icons: tenant.favicon?.url ? { icon: tenant.favicon.url } : undefined,
+    icons: favicon ? { icon: favicon } : undefined,
     openGraph: {
       title,
       description,
       url: canonical,
-      siteName: tenant.name,
+      siteName: brand.name,
       type: 'website',
       locale: locale === 'bn' ? 'bn_BD' : 'en_US',
       images: ogImage ? [{ url: ogImage, width: 1200, height: 630, alt: title }] : undefined,
@@ -76,9 +82,11 @@ export default async function TenantLandingPage({ params, searchParams }: Props)
   if (!bundle) notFound();
 
   const { tenant, page, products, settings, locale } = bundle;
+  const brand = resolveBrand(page.brand, tenant.name);
 
   const sectionCtx: SectionCtx = {
     tenant,
+    brand,
     locale,
     fallbackLocale: tenant.defaultLocale,
     basePath: ctx.basePath,
@@ -102,13 +110,22 @@ export default async function TenantLandingPage({ params, searchParams }: Props)
       */}
       <style>{themeToCss(page.theme, tenant.slug)}</style>
 
-      <div data-ul-tenant={tenant.slug} className="min-h-screen bg-background text-foreground">
+      {/*
+        overflow-x-clip, not -hidden: hidden would make this a scroll container
+        and break the announcement bar's position: sticky.
+      */}
+      <div data-ul-tenant={tenant.slug} className="min-h-screen w-full max-w-full overflow-x-clip bg-background text-foreground">
         {bundle.preview ? (
           <div className="bg-amber-400 px-4 py-1.5 text-center text-xs font-bold text-amber-950">
             Draft preview — not published
           </div>
         ) : (
-          <TenantAnalytics tracking={page.tracking} />
+          <>
+            {/* Static script, no tenant data beyond the validated slug. */}
+            <script dangerouslySetInnerHTML={{ __html: loaderSeenScript(tenant.slug) }} />
+            <LandingLoader brand={brand} slug={tenant.slug} />
+            <TenantAnalytics tracking={page.tracking} />
+          </>
         )}
 
         <RenderPage sections={page.sections} ctx={sectionCtx} />

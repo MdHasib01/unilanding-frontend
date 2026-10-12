@@ -13,8 +13,11 @@ import { AnnouncementBar } from './blocks/announcement-bar';
 import { Hero } from './blocks/hero';
 import { BenefitsOrbit, BenefitsGrid } from './blocks/benefits';
 import { Imagine, Comparison, EmotionalCost, Guarantee } from './blocks/persuasion';
-import { ReviewsCarousel, Certifications, DoctorsCarousel, LogoCloud } from './blocks/proof';
-import { Faq, Countdown, VideoEmbed, ImageText, RichText } from './blocks/content';
+import { DoctorsCarousel, LogoCloud } from './blocks/proof';
+import { ReviewsCarousel } from './blocks/reviews';
+import { Certifications } from './blocks/certifications';
+import { Faq } from './blocks/faq';
+import { Countdown, VideoEmbed, ImageText, RichText } from './blocks/content';
 import { PricingCard } from './blocks/pricing-card';
 import { OrderForm } from './blocks/order-form';
 import { Footer, StickyCta, FloatingActions } from './blocks/chrome';
@@ -40,8 +43,8 @@ export const SECTION_REGISTRY: Record<SectionType, SectionMeta> = {
     Renderer: AnnouncementBar as SectionMeta['Renderer'],
     singleton: true,
     pinned: 'top',
-    description: 'A thin bar at the very top, with an optional countdown.',
-    descriptionBn: 'পেজের সবার উপরে সরু একটি বার, চাইলে কাউন্টডাউন সহ।',
+    description: 'The brand-coloured strip at the very top, with a live countdown.',
+    descriptionBn: 'পেজের সবার উপরে ব্র্যান্ড কালারের বার, লাইভ কাউন্টডাউন সহ।',
   },
 
   hero: {
@@ -54,7 +57,7 @@ export const SECTION_REGISTRY: Record<SectionType, SectionMeta> = {
     defaults: sectionDefaults.hero,
     Renderer: Hero as SectionMeta['Renderer'],
     singleton: true,
-    description: 'The first screen: headline, promise, main call to action.',
+    description: 'The first screen: two-line headline, a pill of supporting copy, order and Messenger buttons.',
     descriptionBn: 'প্রথম স্ক্রিন — শিরোনাম, প্রতিশ্রুতি ও মূল বাটন।',
   },
 
@@ -67,8 +70,8 @@ export const SECTION_REGISTRY: Record<SectionType, SectionMeta> = {
     schema: sectionSchemas.imagine,
     defaults: sectionDefaults.imagine,
     Renderer: Imagine as SectionMeta['Renderer'],
-    description: 'Two columns contrasting life without and with the product.',
-    descriptionBn: 'দুই কলামে — পণ্যটি ছাড়া আর পণ্যটির সাথে।',
+    description: 'A headline over one big before / after image, then a call to action.',
+    descriptionBn: 'বড় একটি আগে / পরে ছবি, উপরে শিরোনাম ও নিচে বাটন।',
   },
 
   benefitsOrbit: {
@@ -80,8 +83,8 @@ export const SECTION_REGISTRY: Record<SectionType, SectionMeta> = {
     schema: sectionSchemas.benefitsOrbit,
     defaults: sectionDefaults.benefitsOrbit,
     Renderer: BenefitsOrbit as SectionMeta['Renderer'],
-    description: 'Benefits arranged around the product. Falls back to a list on mobile.',
-    descriptionBn: 'পণ্যের চারপাশে উপকারিতা। মোবাইলে তালিকা আকারে।',
+    description: 'Numbered benefits arranged in a ring around the floating product.',
+    descriptionBn: 'ভাসমান পণ্যের চারপাশে নম্বরসহ উপকারিতা।',
   },
 
   benefitsGrid: {
@@ -112,15 +115,15 @@ export const SECTION_REGISTRY: Record<SectionType, SectionMeta> = {
 
   certifications: {
     type: 'certifications',
-    label: 'Certifications',
-    labelBn: 'সার্টিফিকেশন',
+    label: 'Trust: certifications & doctors',
+    labelBn: 'আস্থা: সার্টিফিকেশন ও চিকিৎসক',
     group: 'social',
     icon: Award,
     schema: sectionSchemas.certifications,
     defaults: sectionDefaults.certifications,
     Renderer: Certifications as SectionMeta['Renderer'],
-    description: 'Badges: BSTI, lab tested, halal, and so on.',
-    descriptionBn: 'ব্যাজ — BSTI, ল্যাব টেস্টেড, হালাল ইত্যাদি।',
+    description: 'Certification badges, then a carousel of doctors recommending the product.',
+    descriptionBn: 'সার্টিফিকেশন ব্যাজ, তারপর চিকিৎসকদের সুপারিশের ক্যারোসেল।',
   },
 
   doctorsCarousel: {
@@ -171,7 +174,7 @@ export const SECTION_REGISTRY: Record<SectionType, SectionMeta> = {
     schema: sectionSchemas.emotionalCost,
     defaults: sectionDefaults.emotionalCost,
     Renderer: EmotionalCost as SectionMeta['Renderer'],
-    description: 'Puts a number on doing nothing. Strong closer before pricing.',
+    description: 'A big image and the emotional and money cost of doing nothing.',
     descriptionBn: 'কিছু না করার খরচ হিসেব করে দেখায়। দামের আগে কাজে দেয়।',
   },
 
@@ -197,7 +200,7 @@ export const SECTION_REGISTRY: Record<SectionType, SectionMeta> = {
     schema: sectionSchemas.pricingCard,
     defaults: sectionDefaults.pricingCard,
     Renderer: PricingCard as SectionMeta['Renderer'],
-    description: 'Shows the price from your product catalogue, never typed by hand.',
+    description: 'Ribbon, product shot, real prices from your catalogue and a countdown.',
     descriptionBn: 'প্রোডাক্ট ক্যাটালগ থেকে দাম দেখায় — হাতে লিখতে হয় না।',
   },
 
@@ -306,13 +309,13 @@ export const SECTION_REGISTRY: Record<SectionType, SectionMeta> = {
     Renderer: StickyCta as SectionMeta['Renderer'],
     singleton: true,
     pinned: 'floating',
-    description: 'A bar pinned to the bottom once the visitor scrolls.',
-    descriptionBn: 'স্ক্রল করলে নিচে আটকে থাকা একটি বার।',
+    description: 'Price, timer and order button pinned to the bottom once the visitor scrolls.',
+    descriptionBn: 'স্ক্রল করলে নিচে দাম, টাইমার ও অর্ডার বাটন।',
   },
 
   floatingActions: {
     type: 'floatingActions',
-    label: 'WhatsApp & call',
+    label: 'WhatsApp button',
     labelBn: 'হোয়াটসঅ্যাপ ও কল',
     group: 'chrome',
     icon: PhoneCall,
@@ -321,7 +324,7 @@ export const SECTION_REGISTRY: Record<SectionType, SectionMeta> = {
     Renderer: FloatingActions as SectionMeta['Renderer'],
     singleton: true,
     pinned: 'floating',
-    description: 'Floating WhatsApp, call and back-to-top buttons.',
+    description: 'Floating WhatsApp button, with optional call and back-to-top.',
     descriptionBn: 'ভাসমান হোয়াটসঅ্যাপ, কল ও উপরে যাওয়ার বাটন।',
   },
 };

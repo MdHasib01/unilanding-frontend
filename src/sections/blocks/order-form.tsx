@@ -1,110 +1,163 @@
 'use client';
 
+/* eslint-disable @next/next/no-img-element -- payment QR and logos may be tenant uploads from any host */
+
 import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useRouter } from 'next/navigation';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { AlertCircle, Loader2, ShoppingCart, Truck } from 'lucide-react';
 import { tt } from '@/lib/i18n-text';
-import { SectionShell } from '@/components/shared/section-shell';
 import { formatMoney } from '@/lib/format';
 import { captureAttribution, readMetaCookies } from '@/lib/attribution';
 import { BD_DISTRICTS } from '@/lib/bd-locations';
+import { TEMPLATE_ASSET } from '@/lib/brand';
 import { cn } from '@/lib/utils';
+import { Reveal } from '@/components/shared/reveal';
+import { GridPattern } from '@/components/landing/grid-pattern';
 import type { SectionRendererProps } from '../types';
 
 type Data = {
   headline?: unknown;
   subheadline?: unknown;
   productId?: string;
+  deliveryTitle?: unknown;
+  variantLabel?: unknown;
+  nameLabel?: unknown;
+  namePlaceholder?: unknown;
+  phoneLabel?: unknown;
+  addressLabel?: unknown;
+  addressPlaceholder?: unknown;
   showDistrict?: boolean;
   showThana?: boolean;
   showAltPhone?: boolean;
   showEmail?: boolean;
   showNote?: boolean;
+  summaryTitle?: unknown;
+  deliveryLabel?: unknown;
+  freeText?: unknown;
+  savingText?: unknown;
+  totalLabel?: unknown;
+  paymentTitle?: unknown;
+  codNote?: unknown;
+  bkashQr?: { url?: string };
   submitText?: unknown;
-  successNote?: unknown;
+  trustBadges?: { text?: unknown }[];
+  showSocialProof?: boolean;
+  socialCount?: string;
+  socialText?: unknown;
 };
 
-/** Bangladesh mobile numbers. Same rule the reference used, and it is correct. */
+/** Bangladesh mobile numbers. Same rule the server applies. */
 const BD_PHONE = /^01[3-9]\d{8}$/;
 
 const L = {
   bn: {
-    name: 'আপনার নাম', phone: 'মোবাইল নম্বর', altPhone: 'বিকল্প নম্বর', email: 'ইমেইল',
-    district: 'জেলা', thana: 'থানা / এলাকা', address: 'সম্পূর্ণ ঠিকানা', note: 'অতিরিক্ত নোট',
-    payment: 'পেমেন্ট পদ্ধতি', cod: 'ক্যাশ অন ডেলিভারি', subtotal: 'সাব-টোটাল',
-    delivery: 'ডেলিভারি চার্জ', total: 'সর্বমোট', free: 'ফ্রি', qty: 'পরিমাণ',
-    submit: 'অর্ডার কনফার্ম করুন', submitting: 'অর্ডার নেওয়া হচ্ছে…',
-    selectDistrict: 'জেলা নির্বাচন করুন', selectThana: 'থানা নির্বাচন করুন',
+    altPhone: 'বিকল্প নম্বর', email: 'ইমেইল', district: 'জেলা', thana: 'থানা / এলাকা',
+    note: 'অতিরিক্ত নোট', selectDistrict: 'জেলা নির্বাচন করুন', selectThana: 'থানা নির্বাচন করুন',
     nameReq: 'আপনার নাম লিখুন', phoneReq: 'সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন',
-    addressReq: 'আপনার ঠিকানা লিখুন', districtReq: 'জেলা নির্বাচন করুন',
-    trxId: 'ট্রানজেকশন আইডি', trxReq: 'ট্রানজেকশন আইডি দিন',
-    failed: 'অর্ডারটি নেওয়া যায়নি। আবার চেষ্টা করুন বা ফোন করুন।',
-    previewNote: 'এটি প্রিভিউ — এখান থেকে অর্ডার যাবে না।',
+    addressReq: 'আপনার ঠিকানা লিখুন', districtReq: 'জেলা নির্বাচন করুন', trxReq: 'ট্রানজেকশন আইডি দিন',
+    submitting: 'অর্ডার প্রসেস হচ্ছে...', failed: 'অর্ডারটি নেওয়া যায়নি। আবার চেষ্টা করুন বা ফোন করুন।',
+    previewNote: 'এটি প্রিভিউ — এখান থেকে অর্ডার যাবে না।', noProduct: 'কোনো প্রোডাক্ট যোগ করা হয়নি।',
+    sendMoneyNumber: 'পার্সোনাল নম্বর (Send Money)', howTo: 'পেমেন্ট করার নির্দেশাবলী:',
+    step1: 'আপনার মোবাইল অ্যাপ অথবা', step1b: 'ডায়াল করুন।', step2: 'অপশনটি সিলেক্ট করুন।',
+    step3: 'প্রাপক নম্বর লিখুন:', step4: 'মোট পরিমাণ:', step4b: 'টাকা দিয়ে পিন দিন।',
+    step5: 'সেন্ড মানি সফল হওয়ার পর প্রাপ্ত', step5b: 'নিচের ইনপুট বক্সে লিখুন।',
+    trxLabel: 'ট্রানজেকশন আইডি (TrxID)', trxExample: 'উদাহরণ: 9AB12CD34E', trxPlaceholder: 'TrxID এখানে লিখুন (যেমন: 9AB12CD34E)',
   },
   en: {
-    name: 'Your name', phone: 'Mobile number', altPhone: 'Alternate number', email: 'Email',
-    district: 'District', thana: 'Area', address: 'Full address', note: 'Order note',
-    payment: 'Payment method', cod: 'Cash on delivery', subtotal: 'Subtotal',
-    delivery: 'Delivery', total: 'Total', free: 'Free', qty: 'Quantity',
-    submit: 'Confirm order', submitting: 'Placing your order…',
-    selectDistrict: 'Select a district', selectThana: 'Select an area',
+    altPhone: 'Alternate number', email: 'Email', district: 'District', thana: 'Area',
+    note: 'Order note', selectDistrict: 'Select a district', selectThana: 'Select an area',
     nameReq: 'Please enter your name', phoneReq: 'Enter a valid 11-digit mobile number',
-    addressReq: 'Please enter your address', districtReq: 'Please choose a district',
-    trxId: 'Transaction ID', trxReq: 'Enter the transaction ID',
-    failed: 'We could not place your order. Please try again or call us.',
-    previewNote: 'This is a preview — orders are not submitted from here.',
+    addressReq: 'Please enter your address', districtReq: 'Please choose a district', trxReq: 'Enter the transaction ID',
+    submitting: 'Placing your order...', failed: 'We could not place your order. Please try again or call us.',
+    previewNote: 'This is a preview — orders are not submitted from here.', noProduct: 'No product has been added yet.',
+    sendMoneyNumber: 'Personal number (Send Money)', howTo: 'How to pay:',
+    step1: 'Open your mobile app or dial', step1b: '.', step2: 'Choose', step3: 'Enter the number:',
+    step4: 'Amount:', step4b: 'then confirm with your PIN.', step5: 'Enter the', step5b: 'you receive below.',
+    trxLabel: 'Transaction ID (TrxID)', trxExample: 'e.g. 9AB12CD34E', trxPlaceholder: 'Your TrxID (e.g. 9AB12CD34E)',
   },
 } as const;
+
+type Method = {
+  value: string;
+  label: string;
+  logo?: string;
+  dial?: string;
+  number?: string;
+  instructions?: string;
+};
 
 export function OrderForm({ data, ctx }: SectionRendererProps<Data>) {
   const t = (v: unknown) => tt(v, ctx.locale, ctx.fallbackLocale);
   const s = L[ctx.locale] ?? L.bn;
   const router = useRouter();
+  const money = (n: number) => formatMoney(n, ctx.currency, ctx.locale);
 
-  const product = ctx.products.find((p) => p.id === data.productId) ?? ctx.products[0] ?? null;
+  // ── what can be ordered ──
+  // One configured product: its variants are the choice (the reference's
+  // flavour picker). No product configured and several in the catalogue:
+  // the products themselves are the choice.
+  const fixed = ctx.products.find((p) => p.id === data.productId);
+  const [productId, setProductId] = useState<string | null>(fixed?.id ?? ctx.products[0]?.id ?? null);
+  const product = ctx.products.find((p) => p.id === productId) ?? fixed ?? ctx.products[0] ?? null;
   const [variantId, setVariantId] = useState<string | null>(product?.variants?.[0]?.id ?? null);
-  const [qty, setQty] = useState(1);
-  const [submitError, setSubmitError] = useState('');
+  const variant = product?.variants?.find((v) => v.id === variantId) ?? null;
+  const productChoices = !fixed && ctx.products.length > 1 ? ctx.products : [];
+  const variantChoices = (product?.variants?.length ?? 0) > 1 ? product!.variants : [];
 
-  const methods = useMemo(() => {
+  const list = variant ? variant.price : (product?.basePrice ?? 0);
+  const unit = variant ? (variant.offerPrice ?? variant.price) : (product?.offerPrice ?? product?.basePrice ?? 0);
+  const saving = Math.max(0, list - unit);
+
+  const methods = useMemo<Method[]>(() => {
     const p = ctx.settings.payments ?? {};
-    const out: { value: string; label: string; number?: string; instructions?: string }[] = [];
-    if (p.cod?.enabled !== false) out.push({ value: 'cod', label: p.cod?.label || s.cod });
-    if (p.manualBkash?.enabled) out.push({ value: 'manual_bkash', label: 'bKash', number: p.manualBkash.number, instructions: p.manualBkash.instructions });
-    if (p.manualNagad?.enabled) out.push({ value: 'manual_nagad', label: 'Nagad', number: p.manualNagad.number, instructions: p.manualNagad.instructions });
-    if (p.manualRocket?.enabled) out.push({ value: 'manual_rocket', label: 'Rocket', number: p.manualRocket.number, instructions: p.manualRocket.instructions });
-    if (p.bankTransfer?.enabled) out.push({ value: 'bank_transfer', label: 'Bank transfer', instructions: p.bankTransfer.details });
-    return out.length > 0 ? out : [{ value: 'cod', label: s.cod }];
-  }, [ctx.settings.payments, s.cod]);
+    const out: Method[] = [];
+    if (p.cod?.enabled !== false) out.push({ value: 'cod', label: p.cod?.label || 'Cash on Delivery' });
+    if (p.manualBkash?.enabled) {
+      out.push({ value: 'manual_bkash', label: ctx.locale === 'bn' ? 'বিকাশ' : 'bKash', logo: TEMPLATE_ASSET('bkash-logo.webp'), dial: '*247#', number: p.manualBkash.number, instructions: p.manualBkash.instructions });
+    }
+    if (p.manualNagad?.enabled) {
+      out.push({ value: 'manual_nagad', label: ctx.locale === 'bn' ? 'নগদ' : 'Nagad', dial: '*167#', number: p.manualNagad.number, instructions: p.manualNagad.instructions });
+    }
+    if (p.manualRocket?.enabled) {
+      out.push({ value: 'manual_rocket', label: ctx.locale === 'bn' ? 'রকেট' : 'Rocket', dial: '*322#', number: p.manualRocket.number, instructions: p.manualRocket.instructions });
+    }
+    if (p.bankTransfer?.enabled) {
+      out.push({ value: 'bank_transfer', label: 'Bank Transfer', instructions: p.bankTransfer.details });
+    }
+    return out.length > 0 ? out : [{ value: 'cod', label: 'Cash on Delivery' }];
+  }, [ctx.settings.payments, ctx.locale]);
+
+  const needsDistrict = Boolean(data.showDistrict || ctx.settings.orders?.requireDistrict);
 
   const schema = useMemo(
     () =>
-      z.object({
-        name: z.string().trim().min(1, s.nameReq).max(120),
-        phone: z
-          .string()
-          .trim()
-          .transform((v) => v.replace(/[\s-]/g, ''))
-          .refine((v) => BD_PHONE.test(v), s.phoneReq),
-        altPhone: z.string().trim().optional(),
-        email: z.string().trim().email().optional().or(z.literal('')),
-        district: data.showDistrict ? z.string().trim().min(1, s.districtReq) : z.string().optional(),
-        thana: z.string().trim().optional(),
-        address: z.string().trim().min(1, s.addressReq).max(500),
-        note: z.string().trim().max(500).optional(),
-        paymentMethod: z.string().min(1),
-        transactionId: z.string().trim().optional(),
-      })
-      .refine(
-        // A manual mobile payment is worthless to the tenant without the
-        // transaction id to reconcile against.
-        (v) => v.paymentMethod === 'cod' || v.paymentMethod === 'bank_transfer' || Boolean(v.transactionId),
-        { path: ['transactionId'], message: s.trxReq }
-      ),
-    [data.showDistrict, s]
+      z
+        .object({
+          name: z.string().trim().min(1, s.nameReq).max(120),
+          phone: z
+            .string()
+            .trim()
+            .transform((v) => v.replace(/[\s-]/g, '').replace(/^\+?88/, ''))
+            .refine((v) => BD_PHONE.test(v), s.phoneReq),
+          altPhone: z.string().trim().optional(),
+          email: z.string().trim().email().optional().or(z.literal('')),
+          district: needsDistrict ? z.string().trim().min(1, s.districtReq) : z.string().optional(),
+          thana: z.string().trim().optional(),
+          address: z.string().trim().min(1, s.addressReq).max(500),
+          note: z.string().trim().max(500).optional(),
+          paymentMethod: z.string().min(1),
+          transactionId: z.string().trim().optional(),
+        })
+        .refine(
+          // A manual mobile payment is worthless to the tenant without the
+          // transaction id to reconcile against.
+          (v) => v.paymentMethod === 'cod' || v.paymentMethod === 'bank_transfer' || Boolean(v.transactionId),
+          { path: ['transactionId'], message: s.trxReq }
+        ),
+    [needsDistrict, s]
   );
 
   const {
@@ -114,38 +167,28 @@ export function OrderForm({ data, ctx }: SectionRendererProps<Data>) {
     defaultValues: { paymentMethod: methods[0].value, district: '', thana: '' },
   });
 
+  const [submitError, setSubmitError] = useState('');
   const district = watch('district');
   const paymentMethod = watch('paymentMethod');
-  const activeMethod = methods.find((m) => m.value === paymentMethod);
+  const active = methods.find((m) => m.value === paymentMethod) ?? methods[0];
 
   useEffect(() => {
     if (ctx.mode === 'live') captureAttribution();
   }, [ctx.mode]);
 
-  const thanas = useMemo(
-    () => BD_DISTRICTS.find((d) => d.district === district)?.thanas ?? [],
-    [district]
-  );
+  const thanas = useMemo(() => BD_DISTRICTS.find((d) => d.district === district)?.thanas ?? [], [district]);
 
-  const variant = product?.variants?.find((v) => v.id === variantId) ?? null;
-  const unit = variant
-    ? (variant.offerPrice ?? variant.price)
-    : (product?.offerPrice ?? product?.basePrice ?? 0);
-  const subtotal = unit * qty;
-
+  // Display only — the server recomputes all of this from the catalogue and
+  // its own settings, and its answer is the one that is stored.
   const charges = ctx.settings.orders?.deliveryCharges ?? { inside: 0, outside: 0, freeAbove: null };
-  const insideLabel = charges.insideLabel || 'Dhaka';
-  const isInside = district === insideLabel;
+  const isInside = district === (charges.insideLabel || 'Dhaka');
   let delivery = isInside ? charges.inside : charges.outside;
-  if (charges.freeAbove && subtotal >= charges.freeAbove) delivery = 0;
-  // Display only — the server recomputes all of this from the catalogue and its
-  // own settings, and its answer is the one that is stored.
-  const total = subtotal + delivery;
+  if (charges.freeAbove && unit >= charges.freeAbove) delivery = 0;
+  const total = unit + (delivery || 0);
 
   const onSubmit = handleSubmit(async (values) => {
-    if (ctx.mode === 'preview') return;
+    if (ctx.mode === 'preview' || !product) return;
     setSubmitError('');
-
     const { fbp, fbc } = readMetaCookies();
     try {
       const res = await fetch('/api/public/orders', {
@@ -154,14 +197,14 @@ export function OrderForm({ data, ctx }: SectionRendererProps<Data>) {
         body: JSON.stringify({
           customer: { name: values.name, phone: values.phone, altPhone: values.altPhone || '', email: values.email || '' },
           shipping: { district: values.district || '', thana: values.thana || '', address: values.address, note: values.note || '' },
-          items: product ? [{ productId: product.id, variantId: variantId || undefined, qty }] : [],
+          items: [{ productId: product.id, variantId: variant?.id || undefined, qty: 1 }],
           payment: { method: values.paymentMethod, transactionId: values.transactionId || '' },
           locale: ctx.locale,
-          pageUrl: typeof window !== 'undefined' ? window.location.href : '',
+          pageUrl: window.location.href,
           marketing: { fbp, fbc, attribution: captureAttribution() },
         }),
       });
-      const json = await res.json();
+      const json = await res.json().catch(() => ({}));
       if (!res.ok || !json.success) {
         setSubmitError(typeof json.error === 'string' ? json.error : s.failed);
         return;
@@ -172,220 +215,394 @@ export function OrderForm({ data, ctx }: SectionRendererProps<Data>) {
     }
   });
 
-  const field =
-    'w-full rounded-xl border border-input bg-card px-3.5 py-2.5 text-base text-card-foreground outline-none transition placeholder:text-muted-foreground/70 focus:border-primary focus:ring-2 focus:ring-primary/20';
-  const label = 'mb-1.5 block text-sm font-medium text-card-foreground';
-  const errorText = 'mt-1 flex items-center gap-1 text-xs font-medium text-destructive';
+  const input =
+    'h-10 w-full min-w-0 rounded-xl border border-input bg-transparent px-3 py-1 text-xs shadow-xs outline-none transition-[color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive sm:h-11 sm:text-sm';
+  const labelCls = 'text-xs font-medium sm:text-sm';
+  const err = (m?: string) =>
+    m ? (
+      <p className="flex items-center gap-1 text-xs text-destructive">
+        <AlertCircle className="size-3.5 shrink-0" />
+        {m}
+      </p>
+    ) : null;
+
+  const productLabel = product
+    ? `${product.name}${variant ? ` (${variant.name})` : ''} × 1`
+    : '';
 
   return (
-    <SectionShell id="order" width="default" tone="muted">
-      <div className="mb-7 text-center">
+    <section id="order" className="relative mx-auto max-w-6xl scroll-mt-16 overflow-hidden px-3 py-10 sm:px-6 sm:py-16 md:px-8 lg:py-24">
+      <GridPattern patternType="lines" size={32} className="opacity-40" />
+
+      <Reveal className="mx-auto max-w-2xl px-2 text-center">
         {t(data.headline) ? (
-          <h2 className="text-balance text-2xl font-bold text-foreground sm:text-3xl">
-            {t(data.headline)}
+          <h2 className="flex flex-wrap items-center justify-center gap-2 text-balance text-center text-2xl font-extrabold leading-tight text-primary sm:gap-3 sm:text-4xl md:text-5xl">
+            <ShoppingCart className="size-6 shrink-0 text-primary sm:size-8 md:size-9" />
+            <span>{t(data.headline)}</span>
           </h2>
         ) : null}
         {t(data.subheadline) ? (
-          <p className="mx-auto mt-2 max-w-xl text-pretty text-muted-foreground">
+          <p className="mx-auto mt-2 max-w-xl text-center text-xs font-medium leading-relaxed text-muted-foreground sm:mt-3 sm:text-base md:text-lg">
             {t(data.subheadline)}
           </p>
         ) : null}
-      </div>
+      </Reveal>
 
       {ctx.mode === 'preview' ? (
-        <p className="mb-4 rounded-lg border border-dashed border-border bg-card px-4 py-2 text-center text-sm text-muted-foreground">
+        <p className="mx-auto mt-4 max-w-xl rounded-lg border border-dashed border-border bg-card px-4 py-2 text-center text-xs text-muted-foreground">
           {s.previewNote}
         </p>
       ) : null}
 
-      <form onSubmit={onSubmit} noValidate className="grid gap-5 lg:grid-cols-[1.2fr_1fr]">
-        <div className="space-y-4 rounded-2xl border border-border bg-card p-5 sm:p-6">
-          <div>
-            <label className={label} htmlFor="ul-name">{s.name} *</label>
-            <input id="ul-name" {...register('name')} className={field} autoComplete="name" />
-            {errors.name ? <p className={errorText}><AlertCircle className="size-3.5" />{errors.name.message}</p> : null}
-          </div>
+      <Reveal delay={0.15} className="mt-6 sm:mt-10">
+        <form
+          onSubmit={onSubmit}
+          noValidate
+          className="grid grid-cols-1 gap-6 rounded-2xl border border-border/80 bg-card p-3.5 shadow-sm sm:rounded-3xl sm:p-7 sm:shadow-md md:p-8 lg:grid-cols-12 lg:items-start"
+        >
+          {/* ── delivery details ── */}
+          <div className="min-w-0 space-y-6 lg:col-span-7">
+            <div className="space-y-4">
+              <h3 className="flex items-center gap-2 text-base font-bold text-foreground sm:text-xl">
+                <Truck className="size-5 shrink-0 text-primary" />
+                <span>{t(data.deliveryTitle)}</span>
+              </h3>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className={label} htmlFor="ul-phone">{s.phone} *</label>
-              <input
-                id="ul-phone" {...register('phone')} className={field}
-                inputMode="numeric" autoComplete="tel" placeholder="01XXXXXXXXX" maxLength={14}
-              />
-              {errors.phone ? <p className={errorText}><AlertCircle className="size-3.5" />{errors.phone.message}</p> : null}
-            </div>
-            {data.showAltPhone ? (
-              <div>
-                <label className={label} htmlFor="ul-alt">{s.altPhone}</label>
-                <input id="ul-alt" {...register('altPhone')} className={field} inputMode="numeric" />
-              </div>
-            ) : null}
-          </div>
+              <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 sm:gap-4">
+                {productChoices.length > 0 || variantChoices.length > 0 ? (
+                  <div className="col-span-full grid gap-1.5">
+                    <label htmlFor="ul-choice" className="flex items-center justify-between text-xs font-semibold sm:text-sm">
+                      <span>{t(data.variantLabel)}</span>
+                    </label>
+                    {variantChoices.length > 0 ? (
+                      <select
+                        id="ul-choice"
+                        value={variantId ?? ''}
+                        onChange={(e) => setVariantId(e.target.value)}
+                        className="h-11 w-full cursor-pointer rounded-xl border-2 border-primary/40 bg-background px-3.5 text-xs font-bold text-foreground shadow-xs outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary sm:h-12 sm:text-sm"
+                      >
+                        {variantChoices.map((v) => (
+                          <option key={v.id} value={v.id}>
+                            {v.name} — {money(v.offerPrice ?? v.price)}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <select
+                        id="ul-choice"
+                        value={productId ?? ''}
+                        onChange={(e) => {
+                          const next = ctx.products.find((p) => p.id === e.target.value);
+                          setProductId(e.target.value);
+                          setVariantId(next?.variants?.[0]?.id ?? null);
+                        }}
+                        className="h-11 w-full cursor-pointer rounded-xl border-2 border-primary/40 bg-background px-3.5 text-xs font-bold text-foreground shadow-xs outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary sm:h-12 sm:text-sm"
+                      >
+                        {productChoices.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name} — {money(p.offerPrice ?? p.basePrice)}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                ) : null}
 
-          {data.showEmail ? (
-            <div>
-              <label className={label} htmlFor="ul-email">{s.email}</label>
-              <input id="ul-email" type="email" {...register('email')} className={field} autoComplete="email" />
-            </div>
-          ) : null}
-
-          {data.showDistrict ? (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className={label} htmlFor="ul-district">{s.district} *</label>
-                <select
-                  id="ul-district" {...register('district')} className={field}
-                  onChange={(e) => { setValue('district', e.target.value); setValue('thana', ''); }}
-                >
-                  <option value="">{s.selectDistrict}</option>
-                  {BD_DISTRICTS.map((d) => (
-                    <option key={d.district} value={d.district}>
-                      {ctx.locale === 'bn' ? d.bn : d.district}
-                    </option>
-                  ))}
-                </select>
-                {errors.district ? <p className={errorText}><AlertCircle className="size-3.5" />{errors.district.message}</p> : null}
-              </div>
-              {data.showThana ? (
-                <div>
-                  <label className={label} htmlFor="ul-thana">{s.thana}</label>
-                  <select id="ul-thana" {...register('thana')} className={field} disabled={!district}>
-                    <option value="">{s.selectThana}</option>
-                    {thanas.map((th) => <option key={th} value={th}>{th}</option>)}
-                  </select>
+                <div className="col-span-full grid gap-1.5 sm:col-span-1">
+                  <label htmlFor="ul-name" className={labelCls}>{t(data.nameLabel)}</label>
+                  <input
+                    id="ul-name"
+                    autoComplete="name"
+                    placeholder={t(data.namePlaceholder)}
+                    aria-invalid={Boolean(errors.name)}
+                    className={input}
+                    {...register('name')}
+                  />
+                  {err(errors.name?.message)}
                 </div>
-              ) : null}
-            </div>
-          ) : null}
 
-          <div>
-            <label className={label} htmlFor="ul-address">{s.address} *</label>
-            <textarea id="ul-address" rows={3} {...register('address')} className={field} autoComplete="street-address" />
-            {errors.address ? <p className={errorText}><AlertCircle className="size-3.5" />{errors.address.message}</p> : null}
-          </div>
+                <div className="col-span-full grid gap-1.5 sm:col-span-1">
+                  <label htmlFor="ul-phone" className={labelCls}>{t(data.phoneLabel)}</label>
+                  <div className="relative flex items-center">
+                    <span className="pointer-events-none absolute left-3 select-none text-xs font-semibold text-muted-foreground sm:text-sm">
+                      +88
+                    </span>
+                    <input
+                      id="ul-phone"
+                      type="tel"
+                      inputMode="numeric"
+                      autoComplete="tel"
+                      placeholder="01XXXXXXXXX"
+                      maxLength={14}
+                      aria-invalid={Boolean(errors.phone)}
+                      className={cn(input, 'pl-11 sm:pl-12')}
+                      {...register('phone')}
+                    />
+                  </div>
+                  {err(errors.phone?.message)}
+                </div>
 
-          {data.showNote ? (
-            <div>
-              <label className={label} htmlFor="ul-note">{s.note}</label>
-              <textarea id="ul-note" rows={2} {...register('note')} className={field} />
-            </div>
-          ) : null}
-
-          <fieldset>
-            <legend className={label}>{s.payment}</legend>
-            <div className="space-y-2">
-              {methods.map((m) => (
-                <label
-                  key={m.value}
-                  className={cn(
-                    'flex cursor-pointer items-center gap-3 rounded-xl border px-3.5 py-3 transition',
-                    paymentMethod === m.value ? 'border-primary bg-primary/5' : 'border-input hover:border-primary/40'
-                  )}
-                >
-                  <input type="radio" value={m.value} {...register('paymentMethod')} className="size-4 accent-[var(--primary)]" />
-                  <span className="text-sm font-medium text-card-foreground">{m.label}</span>
-                </label>
-              ))}
-            </div>
-
-            {activeMethod?.number || activeMethod?.instructions ? (
-              <div className="mt-3 rounded-xl bg-muted p-3.5 text-sm">
-                {activeMethod.number ? (
-                  <p className="font-semibold text-card-foreground">
-                    {activeMethod.label}: <span className="font-mono">{activeMethod.number}</span>
-                  </p>
+                {data.showAltPhone ? (
+                  <div className="col-span-full grid gap-1.5 sm:col-span-1">
+                    <label htmlFor="ul-alt" className={labelCls}>{s.altPhone}</label>
+                    <input id="ul-alt" inputMode="numeric" className={input} {...register('altPhone')} />
+                  </div>
                 ) : null}
-                {activeMethod.instructions ? (
-                  <p className="mt-1 whitespace-pre-line text-muted-foreground">{activeMethod.instructions}</p>
+
+                {data.showEmail ? (
+                  <div className="col-span-full grid gap-1.5 sm:col-span-1">
+                    <label htmlFor="ul-email" className={labelCls}>{s.email}</label>
+                    <input id="ul-email" type="email" autoComplete="email" className={input} {...register('email')} />
+                  </div>
                 ) : null}
-              </div>
-            ) : null}
 
-            {paymentMethod !== 'cod' ? (
-              <div className="mt-3">
-                <label className={label} htmlFor="ul-trx">{s.trxId} *</label>
-                <input id="ul-trx" {...register('transactionId')} className={field} />
-                {errors.transactionId ? <p className={errorText}><AlertCircle className="size-3.5" />{errors.transactionId.message}</p> : null}
-              </div>
-            ) : null}
-          </fieldset>
-        </div>
-
-        <aside className="h-fit space-y-4 rounded-2xl border border-border bg-card p-5 sm:p-6 lg:sticky lg:top-4">
-          {product ? (
-            <>
-              <h3 className="font-bold text-card-foreground">{product.name}</h3>
-
-              {(product.variants?.length ?? 0) > 1 ? (
-                <div className="flex flex-wrap gap-2">
-                  {product.variants.map((v) => (
-                    <button
-                      key={v.id} type="button" onClick={() => setVariantId(v.id)}
-                      className={cn(
-                        'rounded-full border px-3 py-1 text-sm transition',
-                        v.id === variantId ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground'
-                      )}
+                {needsDistrict ? (
+                  <div className={cn('col-span-full grid gap-1.5', data.showThana && 'sm:col-span-1')}>
+                    <label htmlFor="ul-district" className={labelCls}>{s.district} *</label>
+                    <select
+                      id="ul-district"
+                      className={input}
+                      aria-invalid={Boolean(errors.district)}
+                      {...register('district')}
+                      onChange={(e) => {
+                        setValue('district', e.target.value, { shouldValidate: true });
+                        setValue('thana', '');
+                      }}
                     >
-                      {v.name}
-                    </button>
+                      <option value="">{s.selectDistrict}</option>
+                      {BD_DISTRICTS.map((d) => (
+                        <option key={d.district} value={d.district}>
+                          {ctx.locale === 'bn' ? d.bn : d.district}
+                        </option>
+                      ))}
+                    </select>
+                    {err(errors.district?.message)}
+                  </div>
+                ) : null}
+
+                {needsDistrict && data.showThana ? (
+                  <div className="col-span-full grid gap-1.5 sm:col-span-1">
+                    <label htmlFor="ul-thana" className={labelCls}>{s.thana}</label>
+                    <select id="ul-thana" className={input} disabled={!district} {...register('thana')}>
+                      <option value="">{s.selectThana}</option>
+                      {thanas.map((th) => <option key={th} value={th}>{th}</option>)}
+                    </select>
+                  </div>
+                ) : null}
+
+                <div className="col-span-full grid gap-1.5">
+                  <label htmlFor="ul-address" className={labelCls}>{t(data.addressLabel)}</label>
+                  <input
+                    id="ul-address"
+                    autoComplete="street-address"
+                    placeholder={t(data.addressPlaceholder)}
+                    aria-invalid={Boolean(errors.address)}
+                    className={input}
+                    {...register('address')}
+                  />
+                  {err(errors.address?.message)}
+                </div>
+
+                {data.showNote ? (
+                  <div className="col-span-full grid gap-1.5">
+                    <label htmlFor="ul-note" className={labelCls}>{s.note}</label>
+                    <textarea id="ul-note" rows={2} className={cn(input, 'h-auto py-2')} {...register('note')} />
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </div>
+
+          {/* ── order summary, payment, confirm ── */}
+          <div className="flex min-w-0 flex-col space-y-4 rounded-xl border border-border/60 bg-muted/60 p-4 shadow-xs sm:rounded-2xl sm:p-6 lg:sticky lg:top-24 lg:col-span-5">
+            <h3 className="text-base font-bold text-foreground sm:text-lg">{t(data.summaryTitle)}</h3>
+
+            <div className="space-y-3 rounded-xl border border-border/80 bg-card p-4 shadow-2xs">
+              {product ? (
+                <>
+                  <div className="flex items-start justify-between gap-2 text-xs sm:text-sm">
+                    <span className="font-bold leading-snug text-foreground">{productLabel}</span>
+                    <div className="shrink-0 text-right">
+                      {saving > 0 ? (
+                        <span className="block text-[11px] italic text-muted-foreground line-through sm:text-xs">{money(list)}</span>
+                      ) : null}
+                      <span className="block font-bold text-foreground">{money(unit)}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-0.5 text-xs font-medium text-muted-foreground sm:text-sm">
+                    <span>{t(data.deliveryLabel)}</span>
+                    <span className={cn('font-semibold', delivery ? 'text-foreground' : 'text-emerald-600')}>
+                      {delivery ? money(delivery) : t(data.freeText)}
+                    </span>
+                  </div>
+
+                  {saving > 0 && t(data.savingText) ? (
+                    <div className="rounded-xl border border-primary/20 bg-primary/10 px-3 py-1.5 text-center text-xs font-bold text-primary">
+                      {t(data.savingText)} {money(saving)}
+                    </div>
+                  ) : null}
+
+                  <div className="flex items-center justify-between border-t border-border/80 pt-3">
+                    <span className="text-xs font-semibold text-foreground sm:text-sm">{t(data.totalLabel)}</span>
+                    <span className="text-lg font-extrabold text-primary sm:text-2xl">{money(total)}</span>
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">{s.noProduct}</p>
+              )}
+            </div>
+
+            <div className="border-t border-border/80 pt-4">
+              {t(data.paymentTitle) ? (
+                <span className="mb-2.5 block text-xs font-bold uppercase tracking-wider text-primary">
+                  {t(data.paymentTitle)}
+                </span>
+              ) : null}
+
+              <div className="flex flex-wrap gap-2">
+                {methods.map((m) => (
+                  <label
+                    key={m.value}
+                    className={cn(
+                      'flex flex-1 cursor-pointer select-none items-center justify-center gap-1.5 rounded-xl border px-2 py-2.5 text-xs font-medium transition-all duration-150 sm:gap-2 sm:px-3 sm:text-sm',
+                      paymentMethod === m.value
+                        ? 'border-primary bg-primary/10 font-semibold text-primary shadow-xs ring-1 ring-primary/30'
+                        : 'border-border bg-card text-foreground/80 hover:border-primary/40'
+                    )}
+                  >
+                    <input type="radio" value={m.value} className="sr-only" {...register('paymentMethod')} />
+                    {m.logo ? <img src={m.logo} alt="" className="h-4 w-auto shrink-0 object-contain sm:h-5" /> : null}
+                    <span className="whitespace-nowrap">{m.label}</span>
+                  </label>
+                ))}
+              </div>
+
+              {active.value === 'cod' ? (
+                <div className="mt-3 rounded-xl border border-primary/30 bg-primary/5 p-3 text-xs text-foreground shadow-xs">
+                  <p className="flex items-center gap-1.5 text-xs font-bold text-primary sm:text-sm">
+                    <Truck className="size-4 shrink-0 text-primary" />
+                    <span>{active.label}</span>
+                  </p>
+                  {t(data.codNote) ? (
+                    <p className="mt-1 text-[11px] font-semibold leading-relaxed text-muted-foreground sm:text-xs">{t(data.codNote)}</p>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="mt-3.5 space-y-3 rounded-xl border border-primary/30 bg-card p-3 text-foreground shadow-xs sm:p-4">
+                  {active.value === 'manual_bkash' && data.bkashQr?.url ? (
+                    <div className="overflow-hidden rounded-xl border border-border bg-white p-2 text-center shadow-xs">
+                      <img src={data.bkashQr.url} alt="bKash" className="mx-auto h-auto max-h-36 w-full rounded-lg object-contain sm:max-h-56" />
+                    </div>
+                  ) : null}
+
+                  {active.number ? (
+                    <div className="rounded-xl border border-primary/20 bg-primary/5 p-2.5 text-center sm:p-3">
+                      <span className="block text-[11px] font-medium text-muted-foreground sm:text-xs">
+                        {active.label} {s.sendMoneyNumber}
+                      </span>
+                      <span className="mt-0.5 block select-all font-mono text-base font-bold tracking-wider text-primary sm:text-lg">
+                        {active.number}
+                      </span>
+                    </div>
+                  ) : null}
+
+                  <div className="rounded-xl border border-amber-200/80 bg-amber-50/80 p-2.5 text-[11px] text-amber-950 sm:p-3 sm:text-xs">
+                    <p className="flex items-center gap-1.5 text-xs font-bold text-amber-900 sm:text-sm">
+                      {active.logo ? <img src={active.logo} alt="" className="inline-block h-4 w-auto shrink-0 object-contain" /> : null}
+                      <span>{active.label} {s.howTo}</span>
+                    </p>
+                    {active.dial ? (
+                      <ol className="mt-1.5 list-inside list-decimal space-y-1 pl-0.5 text-[11px] font-medium leading-relaxed text-muted-foreground sm:text-xs">
+                        <li>
+                          {s.step1} <span className="font-mono font-bold text-foreground">{active.dial}</span> {s.step1b}
+                        </li>
+                        <li>
+                          <strong className="text-foreground">Send Money</strong> {s.step2}
+                        </li>
+                        {active.number ? (
+                          <li>
+                            {s.step3} <strong className="font-mono font-bold text-primary">{active.number}</strong>
+                          </li>
+                        ) : null}
+                        <li>
+                          {s.step4} <strong className="font-bold text-primary">{money(total)}/=</strong> {s.step4b}
+                        </li>
+                        <li>
+                          {s.step5} <strong className="text-foreground">Transaction ID (TrxID)</strong> {s.step5b}
+                        </li>
+                      </ol>
+                    ) : null}
+                    {active.instructions ? (
+                      <p className="mt-1.5 whitespace-pre-line font-medium text-muted-foreground">{active.instructions}</p>
+                    ) : null}
+                  </div>
+
+                  {active.value !== 'bank_transfer' ? (
+                    <div className="grid gap-1.5">
+                      <div className="flex items-center justify-between">
+                        <label htmlFor="ul-trx" className="text-xs font-bold text-foreground">
+                          {s.trxLabel} <span className="text-destructive">*</span>
+                        </label>
+                        <span className="text-[10px] text-muted-foreground">{s.trxExample}</span>
+                      </div>
+                      <input
+                        id="ul-trx"
+                        placeholder={s.trxPlaceholder}
+                        aria-invalid={Boolean(errors.transactionId)}
+                        className={cn(input, 'bg-background font-mono uppercase')}
+                        {...register('transactionId')}
+                      />
+                      {err(errors.transactionId?.message)}
+                    </div>
+                  ) : null}
+                </div>
+              )}
+            </div>
+
+            <div className="pt-2">
+              {submitError ? (
+                <div className="mb-3 flex items-center gap-2.5 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs font-bold text-destructive shadow-xs sm:text-sm">
+                  <AlertCircle className="size-4.5 shrink-0" />
+                  <span>{submitError}</span>
+                </div>
+              ) : null}
+
+              <button
+                type="submit"
+                disabled={isSubmitting || !product}
+                className="cta-shine mt-2 flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-brand-cta text-sm font-bold text-brand-cta-foreground shadow-md shadow-brand-cta/20 transition-all hover:bg-brand-cta-dark active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60 sm:h-14 sm:text-lg"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="size-5 animate-spin" />
+                    <span>{s.submitting}</span>
+                  </>
+                ) : (
+                  <span>{t(data.submitText)}</span>
+                )}
+              </button>
+
+              {(data.trustBadges ?? []).length > 0 ? (
+                <div className="mt-3.5 flex flex-wrap items-center justify-center gap-4 text-xs font-semibold text-primary">
+                  {(data.trustBadges ?? []).map((b, i) => (
+                    <span key={i} className="flex items-center gap-1">{t(b.text)}</span>
                   ))}
                 </div>
               ) : null}
 
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">{s.qty}</span>
-                <div className="flex items-center gap-2">
-                  <button type="button" onClick={() => setQty((q) => Math.max(1, q - 1))} aria-label="-"
-                    className="flex size-8 items-center justify-center rounded-lg border border-border text-lg leading-none">−</button>
-                  <span className="w-8 text-center font-mono font-bold tabular-nums">{qty}</span>
-                  <button type="button" onClick={() => setQty((q) => Math.min(20, q + 1))} aria-label="+"
-                    className="flex size-8 items-center justify-center rounded-lg border border-border text-lg leading-none">+</button>
+              {data.showSocialProof && data.socialCount ? (
+                <div className="mt-5 border-t border-border/60 pt-3 text-center">
+                  <div className="text-xl font-extrabold tracking-tight text-primary sm:text-2xl">{data.socialCount}</div>
+                  {t(data.socialText) ? (
+                    <div className="mt-0.5 text-xs font-semibold text-muted-foreground">{t(data.socialText)}</div>
+                  ) : null}
                 </div>
-              </div>
-
-              <dl className="space-y-2 border-t border-border pt-3 text-sm">
-                <Row k={s.subtotal} v={formatMoney(subtotal, ctx.currency, ctx.locale)} />
-                <Row k={s.delivery} v={delivery === 0 ? s.free : formatMoney(delivery, ctx.currency, ctx.locale)} />
-                <div className="flex items-center justify-between border-t border-border pt-2.5">
-                  <dt className="font-bold text-card-foreground">{s.total}</dt>
-                  <dd className="text-xl font-extrabold text-primary">
-                    {formatMoney(total, ctx.currency, ctx.locale)}
-                  </dd>
-                </div>
-              </dl>
-            </>
-          ) : (
-            <p className="text-sm text-muted-foreground">No product configured.</p>
-          )}
-
-          {submitError ? (
-            <p className="flex items-start gap-2 rounded-xl bg-destructive/10 p-3 text-sm font-medium text-destructive">
-              <AlertCircle className="mt-0.5 size-4 shrink-0" />
-              {submitError}
-            </p>
-          ) : null}
-
-          <button
-            type="submit"
-            disabled={isSubmitting || !product}
-            className="cta-shine flex w-full items-center justify-center gap-2 rounded-full bg-[var(--cta)] px-6 py-3.5 text-base font-bold text-[var(--cta-foreground)] shadow transition hover:brightness-95 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {isSubmitting ? <><Loader2 className="size-5 animate-spin" />{s.submitting}</> : (t(data.submitText) || s.submit)}
-          </button>
-
-          {t(data.successNote) ? (
-            <p className="text-center text-xs text-muted-foreground">{t(data.successNote)}</p>
-          ) : null}
-        </aside>
-      </form>
-    </SectionShell>
+              ) : null}
+            </div>
+          </div>
+        </form>
+      </Reveal>
+    </section>
   );
 }
-
-const Row = ({ k, v }: { k: string; v: string }) => (
-  <div className="flex items-center justify-between">
-    <dt className="text-muted-foreground">{k}</dt>
-    <dd className="font-medium text-card-foreground">{v}</dd>
-  </div>
-);

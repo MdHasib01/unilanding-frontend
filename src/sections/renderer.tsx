@@ -136,4 +136,5 @@ export function RenderPage({
   );
 }
 
-export { SectionBoundary };
+/** One section on its own, for the editor's per-section live previews. */
+export { RenderOne as RenderSection, SectionBoundary };

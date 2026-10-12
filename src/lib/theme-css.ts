@@ -10,7 +10,41 @@ export type PageTheme = {
   radius?: string;
   fontHeading?: string;
   fontBody?: string;
+  preset?: string;
 };
+
+/**
+ * The palettes the editor offers as one-click starting points. MilkReady is the
+ * default every new page starts from; the other two are its sister pages in the
+ * reference project.
+ */
+export const THEME_PRESETS = [
+  {
+    id: 'milkready',
+    name: 'MilkReady Sky',
+    theme: { primary: '#0284c7', accent: '#38bdf8', cta: '#ffd666', ctaForeground: '#3a2600', background: '#f8fbff' },
+  },
+  {
+    id: 'milkimom',
+    name: 'Milkimom Crimson',
+    theme: { primary: '#bd0052', accent: '#e37a69', cta: '#ffd666', ctaForeground: '#3a2600', background: '#fff9f6' },
+  },
+  {
+    id: 'smoothflow',
+    name: 'SmoothFlow Pink',
+    theme: { primary: '#e6106e', accent: '#f472b6', cta: '#e6106e', ctaForeground: '#ffffff', background: '#fff9fb' },
+  },
+  {
+    id: 'forest',
+    name: 'Herbal Green',
+    theme: { primary: '#15803d', accent: '#4ade80', cta: '#facc15', ctaForeground: '#3a2600', background: '#f7fdf9' },
+  },
+  {
+    id: 'royal',
+    name: 'Royal Purple',
+    theme: { primary: '#7c3aed', accent: '#a78bfa', cta: '#ffd666', ctaForeground: '#3a2600', background: '#faf8ff' },
+  },
+] as const satisfies readonly { id: string; name: string; theme: PageTheme }[];
 
 /** Only hex colours get through, so a theme value can never inject CSS. */
 const HEX = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
@@ -34,11 +68,11 @@ export function contrastOn(hex: string): string {
 }
 
 const resolve = (theme: PageTheme = {}) => {
-  const primary = safeColor(theme.primary, '#bd0052');
-  const accent = safeColor(theme.accent, '#e37a69');
+  const primary = safeColor(theme.primary, '#0284c7');
+  const accent = safeColor(theme.accent, '#38bdf8');
   const cta = safeColor(theme.cta, '#ffd666');
-  const background = safeColor(theme.background, '#fff9f6');
-  const foreground = safeColor(theme.foreground, '#111827');
+  const background = safeColor(theme.background, '#f8fbff');
+  const foreground = safeColor(theme.foreground, '#0f172a');
   return {
     primary,
     accent,
@@ -72,6 +106,10 @@ export function themeToCss(theme: PageTheme | undefined, scope: string): string 
     `--accent-strong:${t.accent};` +
     `--cta:${t.cta};` +
     `--cta-foreground:${t.ctaForeground};` +
+    `--cta-dark:color-mix(in oklab, ${t.cta} 88%, #000);` +
+    `--primary-dark:color-mix(in oklab, ${t.primary} 78%, #000);` +
+    `--primary-soft:color-mix(in oklab, ${t.primary} 6%, #fff);` +
+    `--primary-tint:color-mix(in oklab, ${t.primary} 16%, #fff);` +
     `--ring:${t.accent};` +
     `--border:color-mix(in oklab, ${t.foreground} 12%, ${t.background});` +
     `--input:color-mix(in oklab, ${t.foreground} 14%, ${t.background});` +
@@ -100,6 +138,14 @@ export function themeToStyle(theme: PageTheme | undefined): CSSProperties {
     '--accent-strong': t.accent,
     '--cta': t.cta,
     '--cta-foreground': t.ctaForeground,
+    '--cta-dark': `color-mix(in oklab, ${t.cta} 88%, #000)`,
+    '--primary-dark': `color-mix(in oklab, ${t.primary} 78%, #000)`,
+    '--primary-soft': `color-mix(in oklab, ${t.primary} 6%, #fff)`,
+    '--primary-tint': `color-mix(in oklab, ${t.primary} 16%, #fff)`,
+    '--border': `color-mix(in oklab, ${t.foreground} 12%, ${t.background})`,
+    '--input': `color-mix(in oklab, ${t.foreground} 14%, ${t.background})`,
+    '--muted': `color-mix(in oklab, ${t.primary} 7%, ${t.background})`,
+    '--muted-foreground': `color-mix(in oklab, ${t.foreground} 62%, ${t.background})`,
     '--ring': t.accent,
     '--card': '#ffffff',
     '--card-foreground': t.foreground,

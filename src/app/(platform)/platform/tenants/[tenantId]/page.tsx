@@ -89,7 +89,7 @@ export default async function TenantDetailPage({
           <CardHeader className="flex-row items-center justify-between">
             <CardTitle className="text-base">Landing pages</CardTitle>
             <Button asChild variant="outline" size="sm">
-              <a href={`${siteUrl}/admin/pages`} target="_blank" rel="noreferrer">
+              <a href={`${siteUrl}/admin/customize`} target="_blank" rel="noreferrer">
                 <LogIn className="size-3.5" />
                 Open their editor
               </a>
@@ -131,7 +131,7 @@ export default async function TenantDetailPage({
                       </Badge>
                       <Button asChild variant="ghost" size="sm">
                         <a
-                          href={`${siteUrl}/admin/pages/${page._id}`}
+                          href={`${siteUrl}/admin/customize`}
                           target="_blank"
                           rel="noreferrer"
                         >

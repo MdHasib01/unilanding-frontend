@@ -49,6 +49,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       // Next 16 no longer overrides scroll-behavior during navigation unless
       // asked, and smooth in-page scrolling is what every CTA relies on.
       data-scroll-behavior="smooth"
+      // The landing loader marks <html> from an inline script before hydration
+      // (see components/landing/landing-loader.tsx).
+      suppressHydrationWarning
       className={cn(bengali.variable, latin.variable, 'font-sans')}
       style={{ ['--font-ui' as string]: locale === 'bn' ? 'var(--font-bengali)' : 'var(--font-latin)' }}
     >

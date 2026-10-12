@@ -1,8 +1,9 @@
-import Image from 'next/image';
 import * as Icons from 'lucide-react';
 import { tt } from '@/lib/i18n-text';
 import { SectionShell, SectionHeading } from '@/components/shared/section-shell';
-import { RevealGroup, RevealItem, Float } from '@/components/shared/reveal';
+import { Reveal, RevealGroup, RevealItem, Float } from '@/components/shared/reveal';
+import { RotatingOrbit } from '@/components/landing/rotating-orbit';
+import { toBengaliDigits } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import type { SectionRendererProps } from '../types';
 
@@ -21,76 +22,86 @@ type BenefitItem = { title?: unknown; body?: unknown; icon?: string };
 
 // ───────────────────────────── orbit layout ─────────────────────────────
 
+type OrbitItem = { accent?: unknown; rest?: unknown; title?: unknown; body?: unknown };
+
 type OrbitData = {
-  badge?: unknown;
   title?: unknown;
-  subtitle?: unknown;
   centerImage?: { url?: string; alt?: string };
-  items?: BenefitItem[];
+  items?: OrbitItem[];
 };
 
+const RADIUS_X = 42;
+const RADIUS_Y = 36;
+
+/** Evenly around an ellipse, starting at twelve o'clock. */
+function polarPosition(index: number, total: number) {
+  const angle = (index / total) * 2 * Math.PI - Math.PI / 2;
+  return {
+    left: `${50 + RADIUS_X * Math.cos(angle)}%`,
+    top: `${50 + RADIUS_Y * Math.sin(angle)}%`,
+  };
+}
+
 /**
- * The reference's signature benefits layout: the product in the middle with
- * benefits arranged around it. On narrow screens the ring is meaningless, so it
- * collapses to a plain list rather than being squeezed.
+ * The reference MilkReady benefits: the product floating in the middle of
+ * three slowly turning dashed rings, with numbered benefit cards (Bengali
+ * numerals) placed around it. The same ring on every screen size, as on the
+ * reference — the cards simply shrink.
  */
 export function BenefitsOrbit({ data, ctx }: SectionRendererProps<OrbitData>) {
   const t = (v: unknown) => tt(v, ctx.locale, ctx.fallbackLocale);
   const items = (data.items ?? []).slice(0, 8);
-  const image = data.centerImage?.url;
+  const image = data.centerImage?.url?.trim() || ctx.brand.productImageUrl;
+  const title = t(data.title);
 
   return (
-    <SectionShell width="wide" className="relative">
-      <SectionHeading badge={t(data.badge)} title={t(data.title)} subtitle={t(data.subtitle)} />
-
-      {/* Mobile and tablet: a straightforward list. */}
-      <RevealGroup className="grid gap-4 sm:grid-cols-2 lg:hidden">
-        {items.map((item, i) => (
-          <RevealItem key={i}>
-            <BenefitCard item={item} t={t} />
-          </RevealItem>
-        ))}
-      </RevealGroup>
-
-      {/* Desktop: the ring. */}
-      <div className="relative mx-auto hidden aspect-square w-full max-w-3xl lg:block">
-        {image ? (
-          <Float className="absolute left-1/2 top-1/2 z-10 size-[42%] -translate-x-1/2 -translate-y-1/2">
-            <div className="relative size-full overflow-hidden rounded-full bg-card shadow-xl ring-8 ring-primary/10">
-              <Image
-                src={image}
-                alt={data.centerImage?.alt || ctx.tenant.productName || ctx.tenant.name}
-                fill
-                sizes="400px"
-                className="object-cover"
-              />
-            </div>
-          </Float>
+    <section className="relative mb-0 overflow-hidden bg-white pb-0 pt-2 md:pb-0 md:pt-4">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        {title ? (
+          <div className="mb-4 text-center md:mb-6">
+            <h2 className="text-3xl font-bold leading-tight text-primary sm:text-4xl md:text-5xl">{title}</h2>
+          </div>
         ) : null}
 
-        <div
-          aria-hidden
-          className="absolute left-1/2 top-1/2 size-[70%] -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-dashed border-primary/20"
-        />
+        <div className="relative mx-auto mt-2 aspect-square w-full max-w-[420px] sm:mt-4 sm:max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl">
+          <RotatingOrbit />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Float distance={8} duration={3.5}>
+              {/* eslint-disable-next-line @next/next/no-img-element -- tenant upload, any host */}
+              <img
+                src={image}
+                alt={data.centerImage?.alt || ctx.brand.name}
+                className="h-28 w-auto object-contain drop-shadow-2xl sm:h-44 md:h-[228px] lg:h-64 xl:h-[300px]"
+              />
+            </Float>
+          </div>
 
-        {items.map((item, i) => {
-          // Start at the top and distribute evenly around the circle.
-          const angle = (i / Math.max(1, items.length)) * 2 * Math.PI - Math.PI / 2;
-          const radius = 42;
-          const left = 50 + Math.cos(angle) * radius;
-          const top = 50 + Math.sin(angle) * radius;
-          return (
-            <div
-              key={i}
-              className="absolute w-52 -translate-x-1/2 -translate-y-1/2"
-              style={{ left: `${left}%`, top: `${top}%` }}
-            >
-              <BenefitCard item={item} t={t} compact />
-            </div>
-          );
-        })}
+          {items.map((item, index) => {
+            const accent = t(item.accent ?? item.title);
+            const rest = t(item.rest ?? item.body);
+            return (
+              <div
+                key={index}
+                style={polarPosition(index, items.length)}
+                className="absolute w-24 -translate-x-1/2 -translate-y-1/2 sm:w-40 md:w-44 lg:w-48 xl:w-56"
+              >
+                <Reveal delay={0.1 * index}>
+                  <div className="flex flex-col items-center gap-1 rounded-xl border border-primary/20 bg-white p-2 text-center shadow-md transition-colors hover:border-primary/40 sm:gap-2 sm:rounded-2xl sm:p-3">
+                    <span className="flex size-7 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground shadow-sm sm:size-9 sm:text-sm md:size-10 md:text-base">
+                      {ctx.locale === 'bn' ? toBengaliDigits(index + 1) : index + 1}
+                    </span>
+                    <p className="text-[11px] leading-tight sm:text-sm sm:leading-snug md:text-base lg:text-lg">
+                      {accent ? <span className="font-bold text-primary">{accent}</span> : null}{' '}
+                      {rest ? <span className="font-normal text-[#1A1A1A]">{rest}</span> : null}
+                    </p>
+                  </div>
+                </Reveal>
+              </div>
+            );
+          })}
+        </div>
       </div>
-    </SectionShell>
+    </section>
   );
 }
 

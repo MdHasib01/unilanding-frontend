@@ -11,16 +11,27 @@ import { z } from 'zod';
 
 // ── field markers ───────────────────────────────────────────────────────────
 
+const RICH_HELP = 'Wrap words in **double stars** to colour them in your brand colour.';
+
 /** A tenant-authored localised string: { bn, en }. */
-export const i18nText = (label: string, opts: { multiline?: boolean; max?: number } = {}) =>
+export const i18nText = (
+  label: string,
+  opts: { multiline?: boolean; max?: number; rich?: boolean; help?: string } = {}
+) =>
   z
     .union([z.string(), z.record(z.string(), z.string())])
     .optional()
     .describe(
-      JSON.stringify({ control: 'i18n', label, multiline: opts.multiline ?? false, max: opts.max ?? 400 })
+      JSON.stringify({
+        control: 'i18n',
+        label,
+        multiline: opts.multiline ?? false,
+        max: opts.max ?? 400,
+        help: opts.help ?? (opts.rich ? RICH_HELP : undefined),
+      })
     );
 
-export const imageField = (label: string) =>
+export const imageField = (label: string, help?: string) =>
   z
     .object({
       url: z.string().max(2000).default(''),
@@ -29,7 +40,7 @@ export const imageField = (label: string) =>
     })
     .partial()
     .optional()
-    .describe(JSON.stringify({ control: 'image', label }));
+    .describe(JSON.stringify({ control: 'image', label, help }));
 
 export const colorField = (label: string) =>
   z
@@ -38,41 +49,43 @@ export const colorField = (label: string) =>
     .optional()
     .describe(JSON.stringify({ control: 'color', label }));
 
-export const text = (label: string, max = 200) =>
-  z.string().max(max).optional().describe(JSON.stringify({ control: 'text', label }));
+export const text = (label: string, max = 200, help?: string) =>
+  z.string().max(max).optional().describe(JSON.stringify({ control: 'text', label, help }));
 
-export const num = (label: string) =>
-  z.coerce.number().optional().describe(JSON.stringify({ control: 'number', label }));
+export const num = (label: string, help?: string) =>
+  z.coerce.number().optional().describe(JSON.stringify({ control: 'number', label, help }));
 
-export const bool = (label: string) =>
-  z.boolean().optional().describe(JSON.stringify({ control: 'switch', label }));
+export const bool = (label: string, help?: string) =>
+  z.boolean().optional().describe(JSON.stringify({ control: 'switch', label, help }));
 
-export const choice = <T extends readonly [string, ...string[]]>(label: string, values: T) =>
-  z.enum(values).optional().describe(JSON.stringify({ control: 'select', label, values }));
+export const choice = <T extends readonly [string, ...string[]]>(
+  label: string,
+  values: T,
+  labels?: Partial<Record<T[number], string>>
+) =>
+  z.enum(values).optional().describe(JSON.stringify({ control: 'select', label, values, labels }));
 
-export const dateField = (label: string) =>
-  z.string().optional().describe(JSON.stringify({ control: 'datetime', label }));
+export const dateField = (label: string, help?: string) =>
+  z.string().optional().describe(JSON.stringify({ control: 'datetime', label, help }));
 
-export const list = (label: string, item: z.ZodTypeAny, max = 40) =>
-  z.array(item).max(max).optional().describe(JSON.stringify({ control: 'array', label }));
+export const list = (label: string, item: z.ZodTypeAny, max = 40, itemLabel?: string) =>
+  z.array(item).max(max).optional().describe(JSON.stringify({ control: 'array', label, itemLabel }));
 
-export const productRef = (label: string) =>
-  z.string().optional().describe(JSON.stringify({ control: 'product', label }));
+export const productRef = (label: string, help?: string) =>
+  z.string().optional().describe(JSON.stringify({ control: 'product', label, help }));
 
 // ── shared item shapes ──────────────────────────────────────────────────────
 
-const bulletItem = z.object({
-  text: i18nText('Text'),
-  icon: text('Icon name', 60),
-});
+const pointItem = z.object({ text: i18nText('Point') });
 
 const reviewItem = z.object({
   name: text('Name', 120),
-  location: text('Location', 120),
+  location: i18nText('Location'),
   rating: num('Rating (1-5)'),
   text: i18nText('Review', { multiline: true, max: 1200 }),
   image: imageField('Photo'),
-  verified: bool('Show verified badge'),
+  timeAgo: i18nText('When (e.g. ২ দিন আগে)'),
+  verified: bool('Show "Verified Purchase"'),
 });
 
 const faqItem = z.object({
@@ -84,14 +97,25 @@ const doctorItem = z.object({
   name: text('Name', 120),
   degree: text('Degree', 160),
   subtitle: i18nText('Subtitle'),
-  description: i18nText('Description', { multiline: true, max: 2000 }),
+  description: i18nText('Quote', { multiline: true, max: 2000 }),
   image: imageField('Photo'),
 });
 
+export const CERT_ICONS = ['award', 'badgeCheck', 'sprout', 'shieldCheck', 'flask', 'leaf', 'heart', 'star'] as const;
+
 const certItem = z.object({
   label: i18nText('Label'),
-  image: imageField('Badge'),
-  note: i18nText('Note'),
+  icon: choice('Icon', CERT_ICONS, {
+    award: 'Award',
+    badgeCheck: 'Badge',
+    sprout: 'Sprout (vegan)',
+    shieldCheck: 'Shield',
+    flask: 'Lab flask',
+    leaf: 'Leaf',
+    heart: 'Heart',
+    star: 'Star',
+  }),
+  image: imageField('Badge image (optional)', 'Replaces the icon when set.'),
 });
 
 const benefitItem = z.object({
@@ -100,9 +124,9 @@ const benefitItem = z.object({
   icon: text('Icon name', 60),
 });
 
-const costRow = z.object({
-  label: i18nText('Label'),
-  amount: text('Amount', 60),
+const orbitItem = z.object({
+  accent: i18nText('Highlighted words (brand colour)'),
+  rest: i18nText('Rest of the line'),
 });
 
 const linkItem = z.object({
@@ -120,117 +144,178 @@ const logoItem = z.object({
   image: imageField('Logo'),
 });
 
+const ctaText = (label = 'Button text') => i18nText(label);
+const ctaTarget = () => text('Button scrolls to (section id)', 80, 'Leave as "order" to scroll to the order form.');
+
 // ── section schemas ─────────────────────────────────────────────────────────
 
 export const sectionSchemas = {
   announcementBar: z.object({
     text: i18nText('Announcement'),
-    countdownTo: dateField('Count down to'),
-    dismissible: bool('Visitor can dismiss'),
+    showCountdown: bool('Show countdown timer'),
+    countdownTo: dateField('Count down to', 'Leave empty to count down to midnight, every day.'),
   }),
 
   hero: z.object({
-    badge: i18nText('Badge'),
-    title: i18nText('Headline', { max: 300 }),
-    titleHighlight: text('Highlight this phrase in the headline', 160),
-    subtitle: i18nText('Subheadline', { multiline: true, max: 600 }),
-    ctaText: i18nText('Button text'),
-    ctaTarget: text('Scrolls to (section id)', 80),
-    image: imageField('Hero image'),
-    imageMobile: imageField('Hero image (mobile)'),
-    trustBadges: list('Trust badges', z.object({ label: i18nText('Label') }), 6),
+    title: i18nText('Headline — first line', { max: 300 }),
+    titleHighlight: i18nText('Headline — second line (brand colour)', { max: 300 }),
+    subtitle: i18nText('Text inside the pill', {
+      multiline: true,
+      max: 600,
+      help: 'Wrap words in **double stars** to make them bold.',
+    }),
+    ctaText: ctaText('Order button text'),
+    ctaTarget: ctaTarget(),
+    showMessenger: bool('Show the Messenger button'),
+    messengerText: i18nText('Messenger button text'),
+    messengerUrl: text('Messenger / Facebook page link', 500),
   }),
 
   imagine: z.object({
-    badge: i18nText('Badge'),
-    title: i18nText('Headline', { max: 300 }),
-    beforeTitle: i18nText('Before — title'),
-    beforeItems: list('Before — points', bulletItem, 8),
-    afterTitle: i18nText('After — title'),
-    afterItems: list('After — points', bulletItem, 8),
+    title: i18nText('Headline', {
+      max: 400,
+      help: '**double stars** = brand colour, __double underscores__ = greyed out.',
+    }),
     image: imageField('Before / after image'),
+    closingLine: i18nText('Line under the image', { rich: true }),
+    ctaText: ctaText(),
+    ctaTarget: ctaTarget(),
   }),
 
   benefitsOrbit: z.object({
-    badge: i18nText('Badge'),
     title: i18nText('Headline', { max: 300 }),
-    subtitle: i18nText('Subheadline', { multiline: true, max: 600 }),
-    centerImage: imageField('Centre image (the product)'),
-    items: list('Benefits', benefitItem, 8),
+    centerImage: imageField('Centre image', 'Leave empty to use the product image from Theme & Brand.'),
+    items: list('Benefits around the product', orbitItem, 8, 'Benefit'),
   }),
 
   benefitsGrid: z.object({
     title: i18nText('Headline', { max: 300 }),
     subtitle: i18nText('Subheadline', { multiline: true, max: 600 }),
     columns: choice('Columns', ['2', '3', '4']),
-    items: list('Benefits', benefitItem, 12),
+    items: list('Benefits', benefitItem, 12, 'Benefit'),
   }),
 
   reviewsCarousel: z.object({
-    title: i18nText('Headline', { max: 300 }),
-    autoplayMs: num('Autoplay delay (ms, 0 = off)'),
-    items: list('Reviews', reviewItem, 30),
+    title: i18nText('Headline', { max: 300, rich: true }),
+    subtitle: i18nText('Subheadline', { max: 400 }),
+    autoplayMs: num('Auto-advance every (ms, 0 = off)'),
+    verifiedLabel: i18nText('Verified badge text'),
+    items: list('Reviews', reviewItem, 30, 'Review'),
+    ctaText: ctaText(),
+    ctaTarget: ctaTarget(),
   }),
 
   certifications: z.object({
     title: i18nText('Headline', { max: 300 }),
-    items: list('Certifications', certItem, 12),
+    subtitle: i18nText('Subheadline', { max: 400 }),
+    items: list('Certifications', certItem, 12, 'Certification'),
+    doctors: list('Doctor recommendations', doctorItem, 12, 'Doctor'),
+    doctorBadge: i18nText('Doctor card badge'),
+    doctorTag: text('Doctor card tag', 60),
+    autoplayMs: num('Auto-advance every (ms, 0 = off)'),
+    ctaText: ctaText(),
+    ctaTarget: ctaTarget(),
   }),
 
   doctorsCarousel: z.object({
     title: i18nText('Headline', { max: 300 }),
-    items: list('Experts', doctorItem, 12),
+    items: list('Experts', doctorItem, 12, 'Expert'),
   }),
 
   faq: z.object({
-    title: i18nText('Headline', { max: 300 }),
-    items: list('Questions', faqItem, 30),
-    defaultOpen: num('Open this one by default (0 = first)'),
+    title: i18nText('Headline', { max: 300, rich: true }),
+    items: list('Questions', faqItem, 30, 'Question'),
+    defaultOpen: num('Open this one by default (1 = first, 0 = none)'),
+    initialVisible: num('Questions shown before "show more"'),
+    showMoreText: i18nText('"Show more" text'),
+    showLessText: i18nText('"Show less" text'),
+    ctaText: ctaText(),
+    ctaTarget: ctaTarget(),
   }),
 
   comparison: z.object({
-    title: i18nText('Headline', { max: 300 }),
-    leftLabel: i18nText('Left column label'),
-    leftItems: list('Left column points', bulletItem, 10),
-    rightLabel: i18nText('Right column label'),
-    rightItems: list('Right column points', bulletItem, 10),
+    eyebrow: i18nText('Small line above the headline'),
+    circledText: i18nText('Circled words'),
+    title: i18nText('Rest of the headline'),
+    subtitle: i18nText('Question under the headline'),
+    leftLabel: i18nText('Left card — title'),
+    leftTag: i18nText('Left card — tag'),
+    leftItems: list('Left card — points', pointItem, 10, 'Point'),
+    rightBadge: i18nText('Right card — corner badge'),
+    rightLabel: i18nText('Right card — title'),
+    rightItems: list('Right card — points', pointItem, 10, 'Point'),
+    closingLine: i18nText('Closing line'),
+    closingHighlight: i18nText('Closing line (brand colour)'),
+    closingQuestion: i18nText('Closing question'),
+    ctaText: ctaText(),
+    ctaTarget: ctaTarget(),
   }),
 
   emotionalCost: z.object({
-    title: i18nText('Headline', { max: 300 }),
-    body: i18nText('Body', { multiline: true, max: 2000 }),
-    costRows: list('Cost breakdown', costRow, 8),
-    conclusion: i18nText('Conclusion', { multiline: true, max: 600 }),
     image: imageField('Image'),
+    title: i18nText('Headline', {
+      max: 400,
+      help: 'Wrap words in !!double exclamation marks!! to colour them red.',
+    }),
+    highlight: i18nText('Red box', { multiline: true, max: 600, help: 'Wrap words in **double stars** to make them bold.' }),
+    body: i18nText('Paragraph', { multiline: true, max: 2000 }),
+    aside: i18nText('Italic line', { multiline: true, max: 600 }),
+    conclusion: i18nText('Bold closing line', { multiline: true, max: 600 }),
+    emoji: text('Emoji', 8),
   }),
 
   guarantee: z.object({
-    title: i18nText('Headline', { max: 300 }),
-    text: i18nText('Body', { multiline: true, max: 1200 }),
-    days: num('Guarantee length (days)'),
-    badgeImage: imageField('Badge image'),
+    title: i18nText('Headline', { max: 300, rich: true }),
+    subtitle: i18nText('Subheadline', { max: 400 }),
+    cardTitle: i18nText('Card title', { max: 300 }),
+    text: i18nText('Card text', { multiline: true, max: 1200 }),
+    badgeImage: imageField('Badge image (optional)', 'Replaces the shield icon when set.'),
   }),
 
   pricingCard: z.object({
-    title: i18nText('Headline', { max: 300 }),
-    productId: productRef('Product'),
-    showVariants: bool('Let the visitor choose a variant'),
-    savingsLabel: i18nText('Savings label'),
-    ctaText: i18nText('Button text'),
-    bullets: list('What is included', bulletItem, 10),
+    title: i18nText('Headline', { max: 300, rich: true }),
+    productId: productRef('Product', 'Prices come from the product, so they are always the real ones.'),
+    productTitle: i18nText('Product title on the card', { help: 'Leave empty to use the product name.' }),
+    image: imageField('Product image', 'Leave empty to use the product image.'),
+    ribbonText: text('Corner ribbon', 40, 'Leave empty to show the discount, e.g. "40% OFF".'),
+    savingsText: i18nText('Savings pill', {
+      help: 'Use {amount} and {percent}, e.g. "আপনার সাশ্রয় {amount} ({percent}% ছাড়)".',
+    }),
+    showTimer: bool('Show countdown'),
+    timerLabel: i18nText('Countdown label'),
+    ctaText: ctaText(),
+    ctaTarget: ctaTarget(),
   }),
 
   orderForm: z.object({
     headline: i18nText('Headline', { max: 300 }),
     subheadline: i18nText('Subheadline', { multiline: true, max: 600 }),
     productId: productRef('Product'),
-    showDistrict: bool('Ask for district'),
+    deliveryTitle: i18nText('Form title'),
+    variantLabel: i18nText('Variant picker label'),
+    nameLabel: i18nText('Name label'),
+    namePlaceholder: i18nText('Name placeholder'),
+    phoneLabel: i18nText('Phone label'),
+    addressLabel: i18nText('Address label'),
+    addressPlaceholder: i18nText('Address placeholder'),
+    showDistrict: bool('Ask for district', 'Always shown when your order settings require it.'),
     showThana: bool('Ask for area / thana'),
     showAltPhone: bool('Ask for a second phone number'),
     showEmail: bool('Ask for email'),
     showNote: bool('Allow an order note'),
-    submitText: i18nText('Button text'),
-    successNote: i18nText('Message after ordering', { multiline: true, max: 600 }),
+    summaryTitle: i18nText('Summary title'),
+    deliveryLabel: i18nText('Delivery charge label'),
+    freeText: i18nText('"Free delivery" text'),
+    savingText: i18nText('Savings label'),
+    totalLabel: i18nText('Total label'),
+    paymentTitle: i18nText('Payment section title'),
+    codNote: i18nText('Cash on delivery note'),
+    bkashQr: imageField('bKash QR / instruction image'),
+    submitText: i18nText('Order button text'),
+    trustBadges: list('Lines under the button', pointItem, 4, 'Line'),
+    showSocialProof: bool('Show order counter'),
+    socialCount: text('Order counter number', 30),
+    socialText: i18nText('Order counter text'),
   }),
 
   countdown: z.object({
@@ -241,7 +326,7 @@ export const sectionSchemas = {
 
   logoCloud: z.object({
     title: i18nText('Headline', { max: 300 }),
-    items: list('Logos', logoItem, 20),
+    items: list('Logos', logoItem, 20, 'Logo'),
   }),
 
   videoEmbed: z.object({
@@ -256,8 +341,8 @@ export const sectionSchemas = {
     body: i18nText('Body', { multiline: true, max: 3000 }),
     image: imageField('Image'),
     imageSide: choice('Image side', ['left', 'right']),
-    ctaText: i18nText('Button text'),
-    ctaTarget: text('Scrolls to (section id)', 80),
+    ctaText: ctaText(),
+    ctaTarget: ctaTarget(),
   }),
 
   richText: z.object({
@@ -268,27 +353,31 @@ export const sectionSchemas = {
 
   footer: z.object({
     text: i18nText('About line', { multiline: true, max: 600 }),
+    contactTitle: i18nText('Contact heading'),
     phone: text('Phone', 60),
     email: text('Email', 160),
     address: i18nText('Address', { multiline: true, max: 400 }),
-    links: list('Links', linkItem, 12),
-    socials: list('Social profiles', socialItem, 8),
+    links: list('Links', linkItem, 12, 'Link'),
+    socials: list('Social profiles', socialItem, 8, 'Profile'),
+    rightsText: i18nText('Copyright line'),
     showPoweredBy: bool('Show "Powered by UniLanding"'),
   }),
 
   stickyCta: z.object({
-    text: i18nText('Text'),
-    ctaText: i18nText('Button text'),
-    target: text('Scrolls to (section id)', 80),
+    productId: productRef('Price shown from product'),
+    showPrice: bool('Show price'),
+    discountText: text('Discount tag', 40, 'Leave empty to show the discount, e.g. "৪০% ছাড়".'),
+    showCountdown: bool('Show countdown'),
+    ctaText: ctaText(),
+    target: ctaTarget(),
     showAfterPx: num('Appear after scrolling (px)'),
-    mobileOnly: bool('Mobile only'),
   }),
 
   floatingActions: z.object({
     whatsappNumber: text('WhatsApp number', 40),
-    whatsappMessage: i18nText('Pre-filled message'),
-    callNumber: text('Phone number', 40),
-    backToTop: bool('Show back-to-top'),
+    whatsappMessage: i18nText('Pre-filled WhatsApp message'),
+    callNumber: text('Call button number (optional)', 40),
+    backToTop: bool('Show back-to-top button'),
   }),
 } as const;
 
@@ -303,6 +392,9 @@ export type FieldHint = {
   multiline?: boolean;
   max?: number;
   values?: string[];
+  labels?: Record<string, string>;
+  help?: string;
+  itemLabel?: string;
 };
 
 export function readHint(schema: z.ZodTypeAny): FieldHint | null {

@@ -1,4 +1,5 @@
 import { serverEnv } from '@/env';
+import type { PageBrand } from './brand';
 
 /**
  * Server-side data loading for public pages.
@@ -58,6 +59,7 @@ export type PublicPage = {
   template: string;
   revision: number;
   publishedAt: string | null;
+  brand?: PageBrand;
   seo: {
     title?: Record<string, string> | string;
     description?: Record<string, string> | string;

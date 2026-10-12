@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
-import { ChevronDown } from 'lucide-react';
 import { tt } from '@/lib/i18n-text';
 import { SectionShell, SectionHeading } from '@/components/shared/section-shell';
 import { Reveal } from '@/components/shared/reveal';
@@ -12,68 +11,6 @@ import type { SectionRendererProps } from '../types';
 
 type Img = { url?: string; alt?: string };
 type T = (v: unknown) => string;
-
-// ───────────────────────────── FAQ ─────────────────────────────
-
-type FaqData = {
-  title?: unknown;
-  defaultOpen?: number;
-  items?: { q?: unknown; a?: unknown }[];
-};
-
-export function Faq({ data, ctx }: SectionRendererProps<FaqData>) {
-  const t: T = (v) => tt(v, ctx.locale, ctx.fallbackLocale);
-  const items = (data.items ?? []).filter((i) => t(i.q));
-  const [open, setOpen] = useState<number | null>(data.defaultOpen ?? 0);
-  if (items.length === 0) return null;
-
-  return (
-    <SectionShell width="default" tone="muted">
-      <SectionHeading title={t(data.title)} />
-      <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
-        {items.map((item, i) => {
-          const isOpen = open === i;
-          return (
-            <div key={i}>
-              <h3>
-                <button
-                  type="button"
-                  onClick={() => setOpen(isOpen ? null : i)}
-                  aria-expanded={isOpen}
-                  className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition hover:bg-muted/40"
-                >
-                  <span className="text-sm font-semibold text-card-foreground sm:text-base">
-                    {t(item.q)}
-                  </span>
-                  <ChevronDown
-                    className={cn(
-                      'size-5 shrink-0 text-muted-foreground transition-transform duration-200',
-                      isOpen && 'rotate-180'
-                    )}
-                  />
-                </button>
-              </h3>
-              {/* Grid-rows trick animates to the content's natural height
-                  without measuring it in JS. */}
-              <div
-                className={cn(
-                  'grid transition-all duration-300 ease-out',
-                  isOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
-                )}
-              >
-                <div className="overflow-hidden">
-                  <p className="px-5 pb-4 text-pretty text-sm leading-relaxed text-muted-foreground">
-                    {t(item.a)}
-                  </p>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </SectionShell>
-  );
-}
 
 // ───────────────────────────── countdown ─────────────────────────────
 

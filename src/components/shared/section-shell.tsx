@@ -101,6 +101,54 @@ export function Highlighted({ text, phrase }: { text: string; phrase?: string })
   );
 }
 
+const RICH_TOKEN = /(\*\*[^*]+\*\*|__[^_]+__|!![^!]+!!)/g;
+
+/**
+ * Colours parts of a line WordPress-style, without HTML:
+ *
+ *   **brand**   → brand colour (MilkReady's blue phrases)
+ *   __muted__   → greyed out, for the "Formula Milk" kind of aside
+ *   !!danger!!  → rose, for the cost-of-waiting phrases
+ *
+ * The markers are split into React <span>s — there is no markup in the
+ * stored copy and no dangerouslySetInnerHTML, so a tenant's headline still
+ * cannot inject anything into a page served on their domain.
+ */
+export function RichLine({
+  text,
+  brandClassName = 'text-primary',
+  mutedClassName = 'text-slate-500 font-semibold',
+  dangerClassName = 'text-rose-600',
+}: {
+  text: string;
+  brandClassName?: string;
+  mutedClassName?: string;
+  dangerClassName?: string;
+}) {
+  if (!text) return null;
+  const parts = text.split(RICH_TOKEN).filter((p) => p !== '');
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
+          return <span key={i} className={brandClassName}>{part.slice(2, -2)}</span>;
+        }
+        if (part.startsWith('__') && part.endsWith('__') && part.length > 4) {
+          return <span key={i} className={mutedClassName}>{part.slice(2, -2)}</span>;
+        }
+        if (part.startsWith('!!') && part.endsWith('!!') && part.length > 4) {
+          return <span key={i} className={dangerClassName}>{part.slice(2, -2)}</span>;
+        }
+        return <span key={i}>{part}</span>;
+      })}
+    </>
+  );
+}
+
+/** Strips RichLine markers, for alt text, titles and anywhere colour is meaningless. */
+export const plainRich = (text: string) =>
+  text.replace(/\*\*([^*]+)\*\*|__([^_]+)__|!!([^!]+)!!/g, (_m, a, b, c) => a ?? b ?? c ?? '');
+
 /** Dotted background, ported from the reference's grid-pattern. */
 export function DotGrid({ className }: { className?: string }) {
   return (

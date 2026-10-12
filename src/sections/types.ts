@@ -3,6 +3,7 @@ import type { ZodTypeAny } from 'zod';
 import type { LucideIcon } from 'lucide-react';
 import type { Locale } from '@/lib/constants';
 import type { PublicProduct, PublicSettings, PublicTenant } from '@/lib/server-api';
+import type { ResolvedBrand } from '@/lib/brand';
 
 export const SECTION_TYPES = [
   'announcementBar',
@@ -48,6 +49,8 @@ export type SectionInstance = {
  */
 export type SectionCtx = {
   tenant: PublicTenant;
+  /** Logo, product image and name, already resolved against the defaults. */
+  brand: ResolvedBrand;
   locale: Locale;
   fallbackLocale: Locale;
   basePath: string;
