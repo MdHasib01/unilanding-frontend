@@ -38,10 +38,13 @@ const NAV: NavItem[] = [
   { href: '/platform/settings', key: 'settings', Icon: Settings },
 ];
 
-/** Only the owner sets plans; support staff get a read-only view of the rest. */
+/**
+ * Support staff do not see plans or the audit trail (it holds IPs and emails).
+ * Settings stays visible to everyone for their own profile and password; the
+ * platform configuration on it is owner-only.
+ */
 const ROLE_HIDDEN: Record<string, string[]> = {
-  platform_support: ['/platform/plans', '/platform/settings'],
-  platform_admin: ['/platform/settings'],
+  platform_support: ['/platform/plans', '/platform/audit'],
 };
 
 export function PlatformShell({

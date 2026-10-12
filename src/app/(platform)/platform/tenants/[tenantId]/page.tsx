@@ -14,6 +14,9 @@ import { Progress } from '@/components/ui/progress';
 import { TenantStatusBadge } from '@/components/platform/tenant-status-badge';
 import { DomainStatusBadge } from '@/components/platform/domain-status-badge';
 import { TenantActions } from '@/components/platform/tenant-actions';
+import { AddDomainDialog } from '@/components/platform/add-domain-dialog';
+import { DomainActions } from '@/components/platform/domain-actions';
+import { getSession } from '@/lib/session.server';
 import { formatDate } from '@/lib/format';
 
 export const metadata: Metadata = { title: 'Tenant · UniLanding' };
@@ -24,8 +27,10 @@ export default async function TenantDetailPage({
   params: Promise<{ tenantId: string }>;
 }) {
   const { tenantId } = await params;
-  const detail = await platformApi.tenant(tenantId);
+  const [detail, session] = await Promise.all([platformApi.tenant(tenantId), getSession()]);
   if (!detail) notFound();
+  const canEditDomains =
+    session?.user.role === 'platform_owner' || session?.user.role === 'platform_admin';
 
   const { tenant, domains, users, pages, counts, usage, primaryHost } = detail;
   const scheme = publicEnv.platformHost.includes('.local') ? 'http' : 'https';
@@ -173,8 +178,13 @@ export default async function TenantDetailPage({
         {/* ── Domains ── */}
         <Card>
           <CardHeader className="flex-row items-center justify-between">
-            <CardTitle className="text-base">Domains</CardTitle>
-            <Globe className="size-4 text-muted-foreground" />
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Globe className="size-4 text-muted-foreground" />
+              Domains
+            </CardTitle>
+            {canEditDomains && tenant.status !== 'archived' ? (
+              <AddDomainDialog tenantId={tenantId} size="sm" />
+            ) : null}
           </CardHeader>
           <CardContent>
             <ul className="divide-y divide-border">
@@ -185,6 +195,7 @@ export default async function TenantDetailPage({
                     <span className="flex shrink-0 items-center gap-1.5">
                       {d.isPrimary ? <Badge variant="outline">Primary</Badge> : null}
                       <DomainStatusBadge status={d.status} sslStatus={d.ssl?.status} type={d.type} />
+                      {canEditDomains ? <DomainActions domain={d} /> : null}
                     </span>
                   </div>
 

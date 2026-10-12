@@ -21,6 +21,7 @@ export type SessionUser = {
   role: string;
   name: string;
   email: string;
+  phone?: string;
   locale: 'bn' | 'en';
   mustChangePassword: boolean;
   active: boolean;

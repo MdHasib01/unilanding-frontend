@@ -104,6 +104,34 @@
       "active": "Active",
       "suspended": "Suspended",
       "archived": "Archived"
+    },
+    "orders": {
+      "title": "Orders",
+      "subtitle": "Every order placed on every tenant's landing page. Click an order for the full details.",
+      "emptyTitle": "No orders found",
+      "emptyBody": "Orders appear here as soon as customers place them. Try clearing the filters."
+    },
+    "domains": {
+      "title": "Domains",
+      "subtitle": "Every hostname that serves a tenant. Custom domains need a DNS record and a certificate before they go live.",
+      "emptyTitle": "No domains found",
+      "emptyBody": "Each tenant gets a platform subdomain automatically. Custom domains you add appear here too."
+    },
+    "plans": {
+      "title": "Plans",
+      "subtitle": "The plan catalog. Editing a plan only affects tenants who move onto it later — existing tenants keep the terms they signed up on.",
+      "emptyTitle": "No plans yet",
+      "emptyBody": "Run the seed script or create the first plan."
+    },
+    "audit": {
+      "title": "Audit log",
+      "subtitle": "Who did what, and when. Kept for a year; passwords and secrets are never recorded.",
+      "emptyTitle": "No entries found",
+      "emptyBody": "Nothing matches these filters."
+    },
+    "settings": {
+      "title": "Settings",
+      "subtitle": "Your account, and how this platform is configured."
     }
   },
   "admin": {
